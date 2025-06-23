@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id               String           @id @default(uuid())
+  title            String
+  description      String           @default("")
+  slug             String           @unique
+  brand            String?
+  category         String?          @default("générique")
+  tags             String[]         @default([])
+  images           String[]         @default([])
+  zones_dispo      String[]         @default([])
+  prices           Json?
+  affiliate_url    String?
+  eco_score        Decimal?         @db.Decimal(3, 2)
+  ai_confidence    Decimal?         @db.Decimal(3, 2)
+  confidence_pct   Int?
+  confidence_color ConfidenceColor? @default(yellow)
+  verified_status  VerifiedStatus   @default(manual_review)
+  resume_fr        String?          @default("")
+  resume_en        String?          @default("")
+  enriched_at      DateTime?
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+  image_url        String?
+  partnerLinks     PartnerLink[]
+
+  @@map("products")
+}
+
+model Region {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  name       String
+  currency   String
+  language   String
+  timezone   String
+  tax_rate   Decimal? @db.Decimal(5, 4)
+  active     Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  @@map("regions")
+}
+
+model Partner {
+  id              String        @id @default(uuid())
+  name            String
+  website         String?
+  commission_rate Decimal       @default(0.05) @db.Decimal(5, 4)
+  ethical_score   Decimal       @default(3.0) @db.Decimal(3, 2)
+  active          Boolean       @default(true)
+  created_at      DateTime      @default(now())
+  links           PartnerLink[]
+
+  @@map("partners")
+}
+
+model PartnerLink {
+  id              String   @id @default(uuid())
+  product_id      String
+  partner_id      String
+  url             String
+  tracking_id     String?
+  commission_rate Decimal  @default(0.05) @db.Decimal(5, 4)
+  clicks          Int      @default(0)
+  active          Boolean  @default(true)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  partner         Partner  @relation(fields: [partner_id], references: [id], onDelete: Cascade)
+  product         Product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@unique([product_id, partner_id])
+  @@map("partner_links")
+}
+
+enum ConfidenceColor {
+  green
+  yellow
+  red
+}
+
+enum VerifiedStatus {
+  verified
+  manual_review
+  rejected
+}
