@@ -15,8 +15,8 @@ dotenv.config();
 
 const app: Application = express();
 
-// ✅ CORS CONFIGURATION - FIX: Utiliser CORS_ORIGIN au lieu de ALLOWED_ORIGINS
-const allowedOrigins = process.env.CORS_ORIGIN?.split(',') || [
+// ✅ CORS CONFIGURATION - Utiliser CORS_ORIGIN avec trim pour nettoyer les espaces
+const allowedOrigins = process.env.CORS_ORIGIN?.split(',').map(origin => origin.trim()) || [
   'http://localhost:3000',
   'http://localhost:5173',
   'http://localhost:4173',
@@ -24,11 +24,24 @@ const allowedOrigins = process.env.CORS_ORIGIN?.split(',') || [
   'https://main--ecolojiafrontv3.netlify.app'
 ];
 
+// Debug: Log de la variable d'environnement
+console.log('🔍 CORS_ORIGIN env:', process.env.CORS_ORIGIN);
+console.log('🔍 Allowed origins après parsing:', allowedOrigins);
+
 const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Autoriser les requêtes sans origin (Postman, mobile apps)
+    if (!origin) {
+      console.log('✅ Requête sans origin autorisée');
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.includes(origin)) {
+      console.log('✅ Origin autorisée:', origin);
       callback(null, true);
     } else {
+      console.log('❌ Origin refusée:', origin);
+      console.log('❌ Origins autorisées:', allowedOrigins);
       callback(new Error('Non autorisé par CORS'));
     }
   },
@@ -49,8 +62,12 @@ app.use('/api/eco-score', ecoScoreRoutes);
 app.use('/', healthRouter);
 
 // ✅ SWAGGER DOCS
+const swaggerUrl = process.env.NODE_ENV === 'production' 
+  ? `https://ecolojiabackendv3.onrender.com/api-docs`
+  : `http://localhost:${process.env.PORT || 3000}/api-docs`;
+  
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-console.log('📘 Swagger docs: http://localhost:3000/api-docs');
+console.log('📘 Swagger docs:', swaggerUrl);
 
 // ✅ LOGS
 console.log('✅ Routes de tracking partenaire activées');
@@ -65,6 +82,7 @@ app.get('/', (_req, res) => {
     version: '1.0.0',
     status: 'operational',
     environment: process.env.NODE_ENV || 'development',
+    cors_origins: allowedOrigins,
     endpoints: [
       'GET /api/products',
       'GET /api/products/search',

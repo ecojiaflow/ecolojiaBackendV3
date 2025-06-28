@@ -15,21 +15,31 @@ const swagger_ui_express_1 = __importDefault(require("swagger-ui-express"));
 const swagger_1 = require("./docs/swagger");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
-// ✅ CORS CONFIGURATION
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+// ✅ CORS CONFIGURATION - Utiliser CORS_ORIGIN avec trim pour nettoyer les espaces
+const allowedOrigins = process.env.CORS_ORIGIN?.split(',').map(origin => origin.trim()) || [
     'http://localhost:3000',
     'http://localhost:5173',
     'http://localhost:4173',
-    'https://ecolojia.com',
-    'https://www.ecolojia.com',
-    'https://ecolojia.vercel.app'
+    'https://ecolojiafrontv3.netlify.app',
+    'https://main--ecolojiafrontv3.netlify.app'
 ];
+// Debug: Log de la variable d'environnement
+console.log('🔍 CORS_ORIGIN env:', process.env.CORS_ORIGIN);
+console.log('🔍 Allowed origins après parsing:', allowedOrigins);
 const corsOptions = {
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
+        // Autoriser les requêtes sans origin (Postman, mobile apps)
+        if (!origin) {
+            console.log('✅ Requête sans origin autorisée');
+            return callback(null, true);
+        }
+        if (allowedOrigins.includes(origin)) {
+            console.log('✅ Origin autorisée:', origin);
             callback(null, true);
         }
         else {
+            console.log('❌ Origin refusée:', origin);
+            console.log('❌ Origins autorisées:', allowedOrigins);
             callback(new Error('Non autorisé par CORS'));
         }
     },
@@ -47,8 +57,11 @@ app.use('/api', partner_routes_1.default);
 app.use('/api/eco-score', eco_score_routes_1.default);
 app.use('/', health_routes_1.default);
 // ✅ SWAGGER DOCS
+const swaggerUrl = process.env.NODE_ENV === 'production'
+    ? `https://ecolojiabackendv3.onrender.com/api-docs`
+    : `http://localhost:${process.env.PORT || 3000}/api-docs`;
 app.use('/api-docs', swagger_ui_express_1.default.serve, swagger_ui_express_1.default.setup(swagger_1.swaggerSpec));
-console.log('📘 Swagger docs: http://localhost:3000/api-docs');
+console.log('📘 Swagger docs:', swaggerUrl);
 // ✅ LOGS
 console.log('✅ Routes de tracking partenaire activées');
 console.log('✅ Routes de score écologique IA activées');
@@ -61,6 +74,7 @@ app.get('/', (_req, res) => {
         version: '1.0.0',
         status: 'operational',
         environment: process.env.NODE_ENV || 'development',
+        cors_origins: allowedOrigins,
         endpoints: [
             'GET /api/products',
             'GET /api/products/search',
