@@ -15,14 +15,13 @@ dotenv.config();
 
 const app: Application = express();
 
-// ✅ CORS CONFIGURATION
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+// ✅ CORS CONFIGURATION - FIX: Utiliser CORS_ORIGIN au lieu de ALLOWED_ORIGINS
+const allowedOrigins = process.env.CORS_ORIGIN?.split(',') || [
   'http://localhost:3000',
   'http://localhost:5173',
   'http://localhost:4173',
-  'https://ecolojia.com',
-  'https://www.ecolojia.com',
-  'https://ecolojia.vercel.app'
+  'https://ecolojiafrontv3.netlify.app',
+  'https://main--ecolojiafrontv3.netlify.app'
 ];
 
 const corsOptions = {
