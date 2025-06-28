@@ -55,7 +55,8 @@ app.use(express_1.default.json());
 app.use('/api', product_routes_1.default);
 app.use('/api', partner_routes_1.default);
 app.use('/api/eco-score', eco_score_routes_1.default);
-app.use('/', health_routes_1.default);
+app.use('/', health_routes_1.default); // Route /health
+app.use('/api', health_routes_1.default); // Route /api/health - FIX AJOUTÉ
 // ✅ SWAGGER DOCS
 const swaggerUrl = process.env.NODE_ENV === 'production'
     ? `https://ecolojiabackendv3.onrender.com/api-docs`
@@ -91,6 +92,7 @@ app.get('/', (_req, res) => {
             'GET /api/eco-score/stats',
             'GET /api/eco-score/test',
             'GET /health',
+            'GET /api/health', // AJOUTÉ dans la doc
             'GET /api-docs'
         ],
         timestamp: new Date().toISOString()
