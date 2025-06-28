@@ -59,7 +59,8 @@ app.use(express.json());
 app.use('/api', productRoutes);
 app.use('/api', partnerRoutes);
 app.use('/api/eco-score', ecoScoreRoutes);
-app.use('/', healthRouter);
+app.use('/', healthRouter);        // Route /health
+app.use('/api', healthRouter);     // Route /api/health - FIX AJOUTÉ
 
 // ✅ SWAGGER DOCS
 const swaggerUrl = process.env.NODE_ENV === 'production' 
@@ -99,6 +100,7 @@ app.get('/', (_req, res) => {
       'GET /api/eco-score/stats',
       'GET /api/eco-score/test',
       'GET /health',
+      'GET /api/health',           // AJOUTÉ dans la doc
       'GET /api-docs'
     ],
     timestamp: new Date().toISOString()
