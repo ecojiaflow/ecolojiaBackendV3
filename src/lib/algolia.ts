@@ -8,8 +8,12 @@ const ALGOLIA_INDEX_NAME = 'products';
 const client = algoliasearch(ALGOLIA_APP_ID, ALGOLIA_ADMIN_KEY);
 const algoliaIndex: SearchIndex = client.initIndex(ALGOLIA_INDEX_NAME);
 
-// ✅ Export direct de l’index pour usage dans syncAlgolia.ts
+// ✅ Export direct de l'index pour usage dans syncAlgolia.ts
 export default algoliaIndex;
+
+// ✅ Export séparé du client pour SearchExperience
+export const searchClient = client;
+export { ALGOLIA_INDEX_NAME };
 
 // ✅ Interface des objets produits Algolia
 export interface AlgoliaProduct {
