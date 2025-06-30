@@ -15,20 +15,11 @@ dotenv.config();
 
 const app: Application = express();
 
-// ✅ CORS ULTRA-PERMISSIF - CORRECTION CRITIQUE
-app.use(cors({
-  origin: true, // ✅ Accepte TOUS les origins
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-key', 'x-api-key', 'X-Requested-With'],
-  optionsSuccessStatus: 200
-}));
-
-// ✅ Headers CORS explicites pour forcer l'acceptation
+// ✅ CORS SIMPLE ET FONCTIONNEL - SUPPRESSION DE LA LOGIQUE DÉFECTUEUSE
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, X-Requested-With');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-cron-key, x-api-key, X-Requested-With');
   res.header('Access-Control-Allow-Credentials', 'true');
   
   if (req.method === 'OPTIONS') {
@@ -37,7 +28,7 @@ app.use((req, res, next) => {
   next();
 });
 
-console.log('🚨 CORS ULTRA-PERMISSIF ACTIVÉ');
+console.log('🚨 CORS MANUEL SIMPLE ACTIVÉ');
 
 // ✅ MIDDLEWARES
 app.use(helmet());
@@ -61,7 +52,7 @@ console.log('📘 Swagger docs:', swaggerUrl);
 // ✅ LOGS
 console.log('✅ Routes de tracking partenaire activées');
 console.log('✅ Routes de score écologique IA activées');
-console.log('✅ CORS configuré pour: ULTRA-PERMISSIF');
+console.log('✅ CORS configuré pour: MANUEL SIMPLE');
 console.log('✅ Base de données:', process.env.DATABASE_URL ? 'connectée' : 'non configurée');
 
 // ✅ ROOT INFO
@@ -71,7 +62,7 @@ app.get('/', (_req, res) => {
     version: '1.0.0',
     status: 'operational',
     environment: process.env.NODE_ENV || 'development',
-    cors_status: 'ULTRA-PERMISSIF',
+    cors_status: 'MANUEL SIMPLE',
     endpoints: [
       'GET /api/products',
       'GET /api/products/search',
