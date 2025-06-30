@@ -15,37 +15,59 @@ dotenv.config();
 
 const app: Application = express();
 
-// ✅ CORS SPÉCIFIQUE POUR NETLIFY
+// ✅ CORS COMPLET POUR TOUS LES DOMAINES NETLIFY
 const allowedOrigins = [
-  'https://frontendv3.netlify.app',
-  'https://ecolojiabackendv3.onrender.com',
-  'http://localhost:3000',
-  'http://localhost:5173'
+  'https://frontendv3.netlify.app',           // FRONTEND PRINCIPAL
+  'https://ecolojiafrontv3.netlify.app',      // FRONTEND ALTERNATIF
+  'https://main--ecolojiafrontv3.netlify.app', // BRANCH PREVIEW
+  'https://ecolojiabackendv3.onrender.com',   // BACKEND SELF
+  'http://localhost:3000',                    // DEV REACT
+  'http://localhost:5173',                    // DEV VITE
+  'http://localhost:4173'                     // DEV VITE PREVIEW
 ];
 
 app.use(cors({
   origin: (origin, callback) => {
+    console.log('🔍 Origin demandée:', origin);
+    
     // Autoriser les requêtes sans origin (Postman, mobile apps)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('✅ Requête sans origin autorisée');
+      return callback(null, true);
+    }
     
     // Vérifier si l'origin est autorisée
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    if (allowedOrigins.includes(origin)) {
+      console.log('✅ Origin autorisée:', origin);
       callback(null, true);
     } else {
       console.log('🚨 Origin bloquée:', origin);
-      callback(new Error('Not allowed by CORS'));
+      console.log('📋 Origins autorisées:', allowedOrigins);
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-key', 'x-api-key', 'X-Requested-With']
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'x-cron-key', 
+    'x-api-key', 
+    'X-Requested-With',
+    'Accept',
+    'Origin'
+  ]
 }));
 
 console.log('✅ CORS configuré pour:', allowedOrigins);
 
 // ✅ MIDDLEWARES
-app.use(helmet());
-app.use(express.json());
+app.use(helmet({
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
 // ✅ ROUTES API
 app.use('/api', productRoutes);
@@ -66,8 +88,9 @@ console.log('📘 Swagger docs:', swaggerUrl);
 console.log('✅ Routes de tracking partenaire activées');
 console.log('✅ Routes de score écologique IA activées');
 console.log('✅ Base de données:', process.env.DATABASE_URL ? 'connectée' : 'non configurée');
+console.log('🌍 Environment:', process.env.NODE_ENV || 'development');
 
-// ✅ ROOT INFO
+// ✅ ROOT INFO ENDPOINT
 app.get('/', (_req, res) => {
   res.json({
     message: 'Ecolojia API',
@@ -76,27 +99,56 @@ app.get('/', (_req, res) => {
     environment: process.env.NODE_ENV || 'development',
     cors_status: 'NETLIFY_CONFIGURED',
     allowed_origins: allowedOrigins,
-    endpoints: [
-      'GET /api/products',
-      'GET /api/products/search',
-      'GET /api/products/stats',
-      'GET /api/products/:slug',
-      'GET /api/products/:id/similar',
-      'POST /api/products',
-      'PUT /api/products/:id',
-      'DELETE /api/products/:id',
-      'GET /api/track/:id',
-      'POST /api/eco-score/calculate',
-      'POST /api/eco-score/update/:productId',
-      'POST /api/eco-score/update-all',
-      'GET /api/eco-score/stats',
-      'GET /api/eco-score/test',
-      'GET /health',
-      'GET /api/health',
-      'GET /api-docs'
-    ],
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      products: [
+        'GET /api/products',
+        'GET /api/products/search',
+        'GET /api/products/stats',
+        'GET /api/products/:slug',
+        'GET /api/products/:id/similar',
+        'POST /api/products',
+        'PUT /api/products/:id',
+        'DELETE /api/products/:id'
+      ],
+      tracking: [
+        'GET /api/track/:id'
+      ],
+      ai: [
+        'POST /api/eco-score/calculate',
+        'POST /api/eco-score/update/:productId',
+        'POST /api/eco-score/update-all',
+        'GET /api/eco-score/stats',
+        'GET /api/eco-score/test'
+      ],
+      health: [
+        'GET /health',
+        'GET /api/health'
+      ],
+      docs: [
+        'GET /api-docs'
+      ]
+    }
   });
+});
+
+// ✅ GESTION ERREURS CORS
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err.message && err.message.includes('not allowed by CORS')) {
+    console.error('❌ Erreur CORS:', {
+      origin: req.get('Origin'),
+      method: req.method,
+      url: req.url,
+      userAgent: req.get('User-Agent')
+    });
+    return res.status(403).json({
+      error: 'CORS_ERROR',
+      message: 'Origin not allowed',
+      origin: req.get('Origin'),
+      allowed_origins: allowedOrigins
+    });
+  }
+  next(err);
 });
 
 export default app;
