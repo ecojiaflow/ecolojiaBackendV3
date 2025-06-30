@@ -31,7 +31,12 @@ const logger = {
 
 /* ---------- Sécurité & middlewares ---------- */
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
+}));
 app.use(express.json());
 
 // Rate limiting général (désactivé pendant les tests)
