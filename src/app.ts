@@ -15,20 +15,33 @@ dotenv.config();
 
 const app: Application = express();
 
-// ✅ CORS SIMPLE ET FONCTIONNEL - SUPPRESSION DE LA LOGIQUE DÉFECTUEUSE
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-cron-key, x-api-key, X-Requested-With');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  next();
-});
+// ✅ CORS SPÉCIFIQUE POUR NETLIFY
+const allowedOrigins = [
+  'https://frontendv3.netlify.app',
+  'https://ecolojiabackendv3.onrender.com',
+  'http://localhost:3000',
+  'http://localhost:5173'
+];
 
-console.log('🚨 CORS MANUEL SIMPLE ACTIVÉ');
+app.use(cors({
+  origin: (origin, callback) => {
+    // Autoriser les requêtes sans origin (Postman, mobile apps)
+    if (!origin) return callback(null, true);
+    
+    // Vérifier si l'origin est autorisée
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('🚨 Origin bloquée:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-key', 'x-api-key', 'X-Requested-With']
+}));
+
+console.log('✅ CORS configuré pour:', allowedOrigins);
 
 // ✅ MIDDLEWARES
 app.use(helmet());
@@ -52,7 +65,6 @@ console.log('📘 Swagger docs:', swaggerUrl);
 // ✅ LOGS
 console.log('✅ Routes de tracking partenaire activées');
 console.log('✅ Routes de score écologique IA activées');
-console.log('✅ CORS configuré pour: MANUEL SIMPLE');
 console.log('✅ Base de données:', process.env.DATABASE_URL ? 'connectée' : 'non configurée');
 
 // ✅ ROOT INFO
@@ -62,7 +74,8 @@ app.get('/', (_req, res) => {
     version: '1.0.0',
     status: 'operational',
     environment: process.env.NODE_ENV || 'development',
-    cors_status: 'MANUEL SIMPLE',
+    cors_status: 'NETLIFY_CONFIGURED',
+    allowed_origins: allowedOrigins,
     endpoints: [
       'GET /api/products',
       'GET /api/products/search',
