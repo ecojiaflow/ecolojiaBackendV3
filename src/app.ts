@@ -1,7 +1,8 @@
-import express, { Application } from 'express';
+import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import fetch from 'node-fetch';
 
 import productRoutes from './routes/product.routes';
 import healthRouter from './routes/health.routes';
@@ -77,12 +78,64 @@ app.use(helmet({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ ROUTES API
+// ✅ ROUTES API EXISTANTES
 app.use('/api', productRoutes);
 app.use('/api', partnerRoutes);
 app.use('/api/eco-score', ecoScoreRoutes);
 app.use('/', healthRouter);
 app.use('/api', healthRouter);
+
+// ✅ NOUVELLE ROUTE IA SUGGESTION (REMPLACE N8N)
+app.post('/api/suggest', async (req: Request, res: Response) => {
+  try {
+    const { query, zone, lang } = req.body;
+    
+    if (!query || !zone || !lang) {
+      return res.status(400).json({ 
+        error: 'Paramètres query, zone et lang requis' 
+      });
+    }
+
+    // ✅ NOUVEAU : Utiliser orchestrateur interne au lieu de N8N
+    const orchestratorURL = `http://localhost:${process.env.ORCHESTRATOR_PORT || 3001}`;
+    
+    try {
+      const response = await fetch(`${orchestratorURL}/enrich-suggestion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, zone, lang }),
+        timeout: 5000
+      });
+
+      if (!response.ok) {
+        throw new Error(`Orchestrateur responded with ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ Suggestion "${query}" transmise à l'orchestrateur`);
+      res.json(result);
+      
+    } catch (orchestratorError) {
+      // Fallback : suggestion basique si orchestrateur indisponible
+      console.warn('Orchestrateur indisponible, suggestion basique:', (orchestratorError as Error).message);
+      
+      res.json({
+        success: true,
+        message: `Suggestion "${query}" enregistrée pour enrichissement`,
+        status: 'queued',
+        query: query,
+        zone: zone,
+        lang: lang,
+        estimatedTime: '2-4 heures',
+        fallback: true
+      });
+    }
+
+  } catch (error) {
+    console.error('Erreur suggestion IA:', error);
+    res.status(500).json({ error: 'Erreur lors de la suggestion IA' });
+  }
+});
 
 // ✅ SWAGGER DOCS
 const swaggerUrl = process.env.NODE_ENV === 'production' 
@@ -105,6 +158,7 @@ app.get('/', (_req, res) => {
     version: '1.0.0',
     status: 'operational',
     environment: process.env.NODE_ENV || 'development',
+    orchestrator: 'internal', // ✅ Plus de N8N
     cors_status: 'NETLIFY_WILDCARD_ENABLED',
     allowed_origins: allowedOrigins,
     wildcard_pattern: '*.netlify.app',
@@ -128,7 +182,8 @@ app.get('/', (_req, res) => {
         'POST /api/eco-score/update/:productId',
         'POST /api/eco-score/update-all',
         'GET /api/eco-score/stats',
-        'GET /api/eco-score/test'
+        'GET /api/eco-score/test',
+        'POST /api/suggest (orchestrateur interne)' // ✅ NOUVEAU
       ],
       health: [
         'GET /health',

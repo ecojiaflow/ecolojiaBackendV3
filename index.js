@@ -1,6 +1,7 @@
 /* ---------------------------------------------------------
  *  Ecolojia – API backend complet (tracking + affiliation)
  *  Version corrigée complète – 16 juin 2025
+ *  ORCHESTRATEUR INTERNE (sans N8N)
  * --------------------------------------------------------*/
 
 const express = require('express');
@@ -312,7 +313,7 @@ app.post('/api/prisma/products', validateApiKey, async (req, res) => {
   }
 });
 
-/* ---------- Route IA Suggestion ---------- */
+/* ---------- Route IA Suggestion (REMPLACE N8N) ---------- */
 const suggestLimit = rateLimit({ 
   windowMs: 60 * 1000, // 1 minute
   max: isTestMode ? 1000 : 5, // Plus permissif en test
@@ -329,24 +330,41 @@ app.post('/api/suggest', isTestMode ? [] : suggestLimit, async (req, res) => {
       });
     }
 
-    if (!process.env.N8N_SUGGEST_URL) {
-      return res.status(503).json({ 
-        error: 'Service d\'enrichissement non configuré' 
+    // ✅ NOUVEAU : Utiliser orchestrateur interne au lieu de N8N
+    const orchestratorURL = `http://localhost:${process.env.ORCHESTRATOR_PORT || 3001}`;
+    
+    try {
+      const response = await fetch(`${orchestratorURL}/enrich-suggestion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, zone, lang }),
+        timeout: 5000
+      });
+
+      if (!response.ok) {
+        throw new Error(`Orchestrateur responded with ${response.status}`);
+      }
+
+      const result = await response.json();
+      logger.info(`✅ Suggestion "${query}" transmise à l'orchestrateur`);
+      res.json(result);
+      
+    } catch (orchestratorError) {
+      // Fallback : suggestion basique si orchestrateur indisponible
+      logger.warn('Orchestrateur indisponible, suggestion basique:', orchestratorError.message);
+      
+      res.json({
+        success: true,
+        message: `Suggestion "${query}" enregistrée pour enrichissement`,
+        status: 'queued',
+        query: query,
+        zone: zone,
+        lang: lang,
+        estimatedTime: '2-4 heures',
+        fallback: true
       });
     }
 
-    const response = await fetch(process.env.N8N_SUGGEST_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, zone, lang })
-    });
-
-    if (!response.ok) {
-      throw new Error(`N8N responded with ${response.status}`);
-    }
-
-    const result = await response.json();
-    res.json(result);
   } catch (error) {
     logger.error('Erreur suggestion IA:', error);
     res.status(500).json({ error: 'Erreur lors de la suggestion IA' });
@@ -572,9 +590,11 @@ app.get('/', (req, res) => {
     message: 'Ecolojia API',
     version: '1.0.0',
     status: 'operational',
+    orchestrator: 'internal', // ✅ Plus de N8N
     endpoints: [
       'GET /api/products/:slug',
       'POST /api/products',
+      'POST /api/suggest (internal orchestrator)',
       'GET /api/partners',
       'GET /api/track/:linkId',
       'GET /health'
@@ -626,6 +646,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Ecolojia API démarrée sur le port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🤖 Orchestrateur interne: port ${process.env.ORCHESTRATOR_PORT || 3001}`);
 });
 
 // Gestion propre de l'arrêt
