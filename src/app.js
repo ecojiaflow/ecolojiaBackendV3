@@ -1,50 +1,47 @@
-import express, { Application, Request, Response } from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import dotenv from 'dotenv';
-import fetch from 'node-fetch';
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const dotenv = require('dotenv');
+const fetch = require('node-fetch');
 
-import productRoutes from './routes/product.routes';
-import healthRouter from './routes/health.routes';
-import partnerRoutes from './routes/partner.routes';
-import ecoScoreRoutes from './routes/eco-score.routes';
+const productRoutes = require('./routes/product.routes');
+const healthRouter = require('./routes/health.routes');
+const partnerRoutes = require('./routes/partner.routes');
+const ecoScoreRoutes = require('./routes/eco-score.routes');
 
-import swaggerUi from 'swagger-ui-express';
-import { swaggerSpec } from './docs/swagger';
+const swaggerUi = require('swagger-ui-express');
+const { swaggerSpec } = require('./docs/swagger');
 
 dotenv.config();
 
-const app: Application = express();
+const app = express();
 
 // ✅ CORS ÉLARGI POUR TOUS LES DOMAINES NETLIFY
 const allowedOrigins = [
-  'https://frontendv3.netlify.app',              // ← AJOUT DU NOUVEAU DOMAINE
-  'https://ecolojiafrontv3.netlify.app',         // FRONTEND ALTERNATIF
-  'https://main--frontendv3.netlify.app',        // BRANCH PREVIEW NOUVEAU
-  'https://main--ecolojiafrontv3.netlify.app',   // BRANCH PREVIEW ANCIEN
-  'https://ecolojiabackendv3.onrender.com',      // BACKEND SELF
-  'http://localhost:3000',                       // DEV REACT
-  'http://localhost:5173',                       // DEV VITE
-  'http://localhost:4173'                        // DEV VITE PREVIEW
+  'https://frontendv3.netlify.app',
+  'https://ecolojiafrontv3.netlify.app',
+  'https://main--frontendv3.netlify.app',
+  'https://main--ecolojiafrontv3.netlify.app',
+  'https://ecolojiabackendv3.onrender.com',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:4173'
 ];
 
 app.use(cors({
   origin: (origin, callback) => {
     console.log('🔍 Origin demandée:', origin);
     
-    // Autoriser les requêtes sans origin (Postman, mobile apps)
     if (!origin) {
       console.log('✅ Requête sans origin autorisée');
       return callback(null, true);
     }
     
-    // Autoriser TOUS les domaines Netlify par pattern matching
     if (origin.includes('.netlify.app')) {
       console.log('✅ Domaine Netlify autorisé:', origin);
       return callback(null, true);
     }
     
-    // Vérifier si l'origin est dans la liste explicite
     if (allowedOrigins.includes(origin)) {
       console.log('✅ Origin autorisée explicitement:', origin);
       callback(null, true);
@@ -68,7 +65,6 @@ app.use(cors({
 }));
 
 console.log('✅ CORS configuré pour:', allowedOrigins);
-console.log('🌐 CORS autorise TOUS les domaines *.netlify.app');
 
 // ✅ MIDDLEWARES
 app.use(helmet({
@@ -78,21 +74,20 @@ app.use(helmet({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 🧪 ROUTES DE TEST DIRECTES - CONTOURNEMENT PROBLÈME RENDER
-app.get('/api/test-barcode', (req: Request, res: Response) => {
+// 🧪 ROUTES DE TEST DIRECTES
+app.get('/api/test-barcode', (req, res) => {
   res.json({ 
     success: true,
     message: 'Route barcode test fonctionne !', 
     timestamp: new Date().toISOString(),
-    source: 'direct-app-ts',
-    note: 'Route de test pour diagnostiquer problème déploiement'
+    source: 'direct-app-js',
+    note: 'Route de test JavaScript'
   });
 });
 
-app.get('/api/products/barcode-direct/:code', (req: Request, res: Response) => {
+app.get('/api/products/barcode-direct/:code', (req, res) => {
   const { code } = req.params;
   
-  // Validation du code-barres
   if (!code || code.trim() === '') {
     return res.status(400).json({
       success: false,
@@ -113,102 +108,34 @@ app.get('/api/products/barcode-direct/:code', (req: Request, res: Response) => {
 
   console.log(`🔍 [DIRECT] Recherche produit par code-barres: ${cleanBarcode}`);
   
-  // Simulation réponse pour test
   res.json({
     success: false,
     error: "Produit non trouvé dans notre base de données",
     barcode: cleanBarcode,
     suggestion_url: `/product-not-found?barcode=${cleanBarcode}`,
     message: "Aidez-nous à enrichir notre base en photographiant ce produit",
-    source: 'direct-app-ts-barcode-route',
+    source: 'direct-app-js-barcode-route',
     timestamp: new Date().toISOString()
   });
 });
 
-// ✅ ROUTES API CORRIGÉES
-app.use('/api/products', productRoutes);  // ← CORRIGÉ : était '/api'
-app.use('/api/partners', partnerRoutes);  // ← CORRIGÉ : était '/api' 
+// ✅ ROUTES API
+app.use('/api/products', productRoutes);
+app.use('/api/partners', partnerRoutes);
 app.use('/api/eco-score', ecoScoreRoutes);
 app.use('/', healthRouter);
 app.use('/api', healthRouter);
 
-// ✅ NOUVELLE ROUTE IA SUGGESTION (REMPLACE N8N)
-app.post('/api/suggest', async (req: Request, res: Response) => {
-  try {
-    const { query, zone, lang } = req.body;
-    
-    if (!query || !zone || !lang) {
-      return res.status(400).json({ 
-        error: 'Paramètres query, zone et lang requis' 
-      });
-    }
-
-    // ✅ NOUVEAU : Utiliser orchestrateur interne au lieu de N8N
-    const orchestratorURL = `http://localhost:${process.env.ORCHESTRATOR_PORT || 3001}`;
-    
-    try {
-      const response = await fetch(`${orchestratorURL}/enrich-suggestion`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, zone, lang }),
-        timeout: 5000
-      });
-
-      if (!response.ok) {
-        throw new Error(`Orchestrateur responded with ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log(`✅ Suggestion "${query}" transmise à l'orchestrateur`);
-      res.json(result);
-      
-    } catch (orchestratorError) {
-      // Fallback : suggestion basique si orchestrateur indisponible
-      console.warn('Orchestrateur indisponible, suggestion basique:', (orchestratorError as Error).message);
-      
-      res.json({
-        success: true,
-        message: `Suggestion "${query}" enregistrée pour enrichissement`,
-        status: 'queued',
-        query: query,
-        zone: zone,
-        lang: lang,
-        estimatedTime: '2-4 heures',
-        fallback: true
-      });
-    }
-
-  } catch (error) {
-    console.error('Erreur suggestion IA:', error);
-    res.status(500).json({ error: 'Erreur lors de la suggestion IA' });
-  }
-});
-
 // ✅ SWAGGER DOCS
-const swaggerUrl = process.env.NODE_ENV === 'production' 
-  ? `https://ecolojiabackendv3.onrender.com/api-docs`
-  : `http://localhost:${process.env.PORT || 3000}/api-docs`;
-  
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-console.log('📘 Swagger docs:', swaggerUrl);
-
-// ✅ LOGS
-console.log('✅ Routes de tracking partenaire activées');
-console.log('✅ Routes de score écologique IA activées');
-console.log('✅ Base de données:', process.env.DATABASE_URL ? 'connectée' : 'non configurée');
-console.log('🌍 Environment:', process.env.NODE_ENV || 'development');
 
 // ✅ ROOT INFO ENDPOINT
-app.get('/', (_req, res) => {
+app.get('/', (req, res) => {
   res.json({
     message: 'Ecolojia API',
     version: '1.0.0',
     status: 'operational',
     environment: process.env.NODE_ENV || 'development',
-    orchestrator: 'internal', // ✅ Plus de N8N
-    cors_status: 'NETLIFY_WILDCARD_ENABLED',
-    allowed_origins: allowedOrigins,
-    wildcard_pattern: '*.netlify.app',
     timestamp: new Date().toISOString(),
     endpoints: {
       products: [
@@ -217,26 +144,25 @@ app.get('/', (_req, res) => {
         'GET /api/products/stats',
         'GET /api/products/:slug',
         'GET /api/products/:id/similar',
-        'GET /api/products/barcode/:code',  // ← AJOUTÉ
+        'GET /api/products/barcode/:code',
         'POST /api/products',
-        'POST /api/products/analyze-photos', // ← AJOUTÉ
+        'POST /api/products/analyze-photos',
         'PUT /api/products/:id',
         'DELETE /api/products/:id'
       ],
       test: [
-        'GET /api/test-barcode',  // ← ROUTE DE TEST
-        'GET /api/products/barcode-direct/:code'  // ← ROUTE DIRECTE
+        'GET /api/test-barcode',
+        'GET /api/products/barcode-direct/:code'
       ],
       tracking: [
-        'GET /api/partners/track/:id'  // ← CORRIGÉ
+        'GET /api/partners/track/:id'
       ],
       ai: [
         'POST /api/eco-score/calculate',
         'POST /api/eco-score/update/:productId',
         'POST /api/eco-score/update-all',
         'GET /api/eco-score/stats',
-        'GET /api/eco-score/test',
-        'POST /api/suggest (orchestrateur interne)' // ✅ NOUVEAU
+        'GET /api/eco-score/test'
       ],
       health: [
         'GET /health',
@@ -249,24 +175,4 @@ app.get('/', (_req, res) => {
   });
 });
 
-// ✅ GESTION ERREURS CORS
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  if (err.message && err.message.includes('not allowed by CORS')) {
-    console.error('❌ Erreur CORS:', {
-      origin: req.get('Origin'),
-      method: req.method,
-      url: req.url,
-      userAgent: req.get('User-Agent')
-    });
-    return res.status(403).json({
-      error: 'CORS_ERROR',
-      message: 'Origin not allowed',
-      origin: req.get('Origin'),
-      allowed_origins: allowedOrigins,
-      hint: 'Tous les domaines *.netlify.app sont maintenant autorisés'
-    });
-  }
-  next(err);
-});
-
-export default app;
+module.exports = app;
