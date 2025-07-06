@@ -12,6 +12,7 @@ model Product {
   title            String
   description      String           @default("")
   slug             String           @unique
+  barcode          String?          @unique  // ✅ NOUVEAU CHAMP AJOUTÉ
   brand            String?
   category         String?          @default("générique")
   tags             String[]         @default([])
@@ -84,10 +85,12 @@ enum ConfidenceColor {
   green
   yellow
   red
+  orange  // ✅ AJOUTÉ pour plus de nuances
 }
 
 enum VerifiedStatus {
   verified
   manual_review
   rejected
+  ai_analyzed  // ✅ AJOUTÉ pour les produits analysés par IA
 }

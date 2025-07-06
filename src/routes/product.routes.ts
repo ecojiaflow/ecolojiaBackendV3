@@ -10,8 +10,287 @@ import { getSimilarProducts } from "../controllers/similar.controller";
 import { createProductSchema, updateProductSchema } from "../validators/product.schema";
 import { createProduct, updateProduct } from "../services/product.service";
 import { Prisma, VerifiedStatus } from "@prisma/client";
+import { prisma } from "../lib/prisma"; // ✅ AJOUT IMPORT MANQUANT
+import { EcoScoreService } from "../services/eco-score.service"; // ✅ AJOUT IMPORT MANQUANT
 
 const router = Router();
+
+/**
+ * @openapi
+ * /api/products/barcode/{code}:
+ *   get:
+ *     summary: Rechercher un produit par code-barres
+ *     description: Recherche un produit dans la base via son code-barres
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: code
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Code-barres du produit (EAN-13, UPC, etc.)
+ *     responses:
+ *       200:
+ *         description: Produit trouvé
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 product:
+ *                   $ref: '#/components/schemas/Product'
+ *                 barcode:
+ *                   type: string
+ *       404:
+ *         description: Produit non trouvé
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 error:
+ *                   type: string
+ *                 barcode:
+ *                   type: string
+ *                 suggestion_url:
+ *                   type: string
+ */
+router.get("/barcode/:code", async (req, res) => {
+  try {
+    const { code } = req.params;
+    
+    // Validation du code-barres
+    if (!code || code.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: "Code-barres requis",
+        barcode: code
+      });
+    }
+
+    // Nettoyer le code-barres
+    const cleanBarcode = code.trim().replace(/[^\d]/g, '');
+    
+    if (cleanBarcode.length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: "Code-barres invalide (minimum 8 chiffres)",
+        barcode: code
+      });
+    }
+
+    console.log(`🔍 Recherche produit par code-barres: ${cleanBarcode}`);
+
+    // Rechercher le produit avec plusieurs méthodes
+    let product = null;
+
+    // 1. Recherche directe par barcode (MAINTENANT POSSIBLE)
+    product = await prisma.product.findFirst({
+      where: {
+        OR: [
+          { barcode: cleanBarcode },
+          { barcode: code },
+          { title: { contains: cleanBarcode, mode: 'insensitive' } },
+          { description: { contains: cleanBarcode, mode: 'insensitive' } }
+        ]
+      }
+    });
+
+    // 2. Si pas trouvé, recherche dans les tags
+    if (!product) {
+      product = await prisma.product.findFirst({
+        where: {
+          tags: {
+            hasSome: [cleanBarcode, code]
+          }
+        }
+      });
+    }
+
+    if (product) {
+      console.log(`✅ Produit trouvé: ${product.title}`);
+      
+      // Convertir les décimaux Prisma
+      const sanitizedProduct = {
+        ...product,
+        eco_score: product.eco_score ? Number(product.eco_score) : null,
+        ai_confidence: product.ai_confidence ? Number(product.ai_confidence) : null
+      };
+      
+      return res.json({
+        success: true,
+        product: sanitizedProduct,
+        barcode: cleanBarcode,
+        search_method: 'database'
+      });
+    }
+
+    // 3. Produit non trouvé - Proposer création
+    console.log(`❌ Produit non trouvé pour code-barres: ${cleanBarcode}`);
+    
+    return res.status(404).json({
+      success: false,
+      error: "Produit non trouvé dans notre base de données",
+      barcode: cleanBarcode,
+      suggestion_url: `/product-not-found?barcode=${cleanBarcode}`,
+      message: "Aidez-nous à enrichir notre base en photographiant ce produit"
+    });
+
+  } catch (error) {
+    console.error('❌ Erreur recherche barcode:', error);
+    res.status(500).json({
+      success: false,
+      error: "Erreur lors de la recherche",
+      message: error instanceof Error ? error.message : "Erreur inconnue"
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /api/products/analyze-photos:
+ *   post:
+ *     summary: Analyser des photos de produit avec OCR et IA
+ *     description: Route pour analyser les photos uploadées depuis ProductNotFoundPage
+ *     tags: [Products]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               barcode:
+ *                 type: string
+ *               photos:
+ *                 type: object
+ *                 properties:
+ *                   front:
+ *                     type: string
+ *                   ingredients:
+ *                     type: string
+ *                   nutrition:
+ *                     type: string
+ *               source:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Analyse réussie et produit créé
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 productId:
+ *                   type: string
+ *                 productSlug:
+ *                   type: string
+ *                 productName:
+ *                   type: string
+ *                 analysis:
+ *                   type: object
+ */
+router.post("/analyze-photos", async (req, res) => {
+  try {
+    const { barcode, photos, source = 'user_photo_analysis' } = req.body;
+
+    console.log(`📸 Analyse photos pour code-barres: ${barcode}`);
+    console.log(`📷 Photos reçues: ${Object.keys(photos || {}).join(', ')}`);
+
+    // Validation
+    if (!barcode) {
+      return res.status(400).json({
+        success: false,
+        error: "Code-barres requis"
+      });
+    }
+
+    if (!photos || !photos.front || !photos.ingredients) {
+      return res.status(400).json({
+        success: false,
+        error: "Photos 'front' et 'ingredients' requises"
+      });
+    }
+
+    // 🔬 SIMULATION OCR - À remplacer par vraie OCR
+    const mockOCRAnalysis = EcoScoreService.simulateOCRAnalysis(photos);
+    
+    console.log(`🧠 Analyse OCR simulée:`, mockOCRAnalysis);
+
+    // Calculer le score écologique avec les données extraites
+    const detailedScore = await EcoScoreService.calculateDetailedEcoScore({
+      title: mockOCRAnalysis.productName,
+      description: mockOCRAnalysis.description,
+      brand: mockOCRAnalysis.brand,
+      category: mockOCRAnalysis.category,
+      tags: mockOCRAnalysis.tags
+    });
+
+    // Générer un slug unique
+    const slug = mockOCRAnalysis.productName
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '') + `-${Date.now()}`;
+
+    // Créer le produit en base
+    const newProduct = await prisma.product.create({
+      data: {
+        title: mockOCRAnalysis.productName,
+        slug: slug,
+        description: mockOCRAnalysis.description,
+        brand: mockOCRAnalysis.brand,
+        category: mockOCRAnalysis.category,
+        barcode: barcode,
+        tags: mockOCRAnalysis.tags,
+        images: photos.front ? [photos.front] : [],
+        eco_score: detailedScore.eco_score,
+        ai_confidence: detailedScore.ai_confidence,
+        confidence_pct: detailedScore.confidence_pct,
+        confidence_color: detailedScore.confidence_color,
+        verified_status: 'ai_analyzed',
+        resume_fr: `Produit analysé automatiquement par IA. Score écologique: ${Math.round(detailedScore.eco_score * 100)}%. ${detailedScore.details || ''}`,
+        enriched_at: new Date(),
+        zones_dispo: ['FR'], // Par défaut France
+        prices: { default: 0 } // Prix à définir plus tard
+      }
+    });
+
+    console.log(`✅ Produit créé: ${newProduct.id} - ${newProduct.title}`);
+
+    res.json({
+      success: true,
+      message: "Produit analysé et créé avec succès",
+      productId: newProduct.id,
+      productSlug: newProduct.slug,
+      productName: newProduct.title,
+      brand: newProduct.brand,
+      category: newProduct.category,
+      ecoScore: Math.round(detailedScore.eco_score * 100),
+      analysis: {
+        ocr_extraction: mockOCRAnalysis,
+        eco_score: detailedScore,
+        confidence: `${detailedScore.confidence_pct}%`
+      },
+      redirect_url: `/product/${newProduct.slug}`
+    });
+
+  } catch (error) {
+    console.error('❌ Erreur analyse photos:', error);
+    res.status(500).json({
+      success: false,
+      error: "Erreur lors de l'analyse des photos",
+      message: error instanceof Error ? error.message : "Erreur inconnue"
+    });
+  }
+});
 
 /**
  * @openapi
@@ -45,7 +324,7 @@ const router = Router();
  *       500:
  *         description: Erreur serveur
  */
-router.get("/products", getAllProducts);
+router.get("/", getAllProducts);
 
 /**
  * @openapi
@@ -106,7 +385,7 @@ router.get("/products", getAllProducts);
  *                 filters:
  *                   type: object
  */
-router.get("/products/search", searchProducts);
+router.get("/search", searchProducts);
 
 /**
  * @openapi
@@ -143,7 +422,7 @@ router.get("/products/search", searchProducts);
  *                   items:
  *                     $ref: '#/components/schemas/Product'
  */
-router.get("/products/stats", getProductStats);
+router.get("/stats", getProductStats);
 
 /**
  * @openapi
@@ -179,7 +458,7 @@ router.get("/products/stats", getProductStats);
  *                   items:
  *                     type: object
  */
-router.post("/products", async (req, res) => {
+router.post("/", async (req, res) => {
   try {
     const data = createProductSchema.parse(req.body);
 
@@ -247,7 +526,7 @@ router.post("/products", async (req, res) => {
  *       404:
  *         description: Produit non trouvé
  */
-router.put("/products/:id", async (req, res) => {
+router.put("/:id", async (req, res) => {
   try {
     const data = updateProductSchema.parse(req.body);
 
@@ -304,7 +583,7 @@ router.put("/products/:id", async (req, res) => {
  *       404:
  *         description: Produit non trouvé
  */
-router.delete("/products/:id", deleteProduct);
+router.delete("/:id", deleteProduct);
 
 /**
  * @openapi
@@ -339,7 +618,7 @@ router.delete("/products/:id", deleteProduct);
  *       404:
  *         description: Produit non trouvé
  */
-router.get("/products/:id/similar", getSimilarProducts);
+router.get("/:id/similar", getSimilarProducts);
 
 /**
  * @openapi
@@ -365,6 +644,6 @@ router.get("/products/:id/similar", getSimilarProducts);
  *       404:
  *         description: Produit non trouvé
  */
-router.get("/products/:slug", getProductBySlug);
+router.get("/:slug", getProductBySlug);
 
 export default router;

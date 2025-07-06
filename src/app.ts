@@ -78,9 +78,9 @@ app.use(helmet({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ ROUTES API EXISTANTES
-app.use('/api', productRoutes);
-app.use('/api', partnerRoutes);
+// ✅ ROUTES API CORRIGÉES
+app.use('/api/products', productRoutes);  // ← CORRIGÉ : était '/api'
+app.use('/api/partners', partnerRoutes);  // ← CORRIGÉ : était '/api' 
 app.use('/api/eco-score', ecoScoreRoutes);
 app.use('/', healthRouter);
 app.use('/api', healthRouter);
@@ -170,12 +170,14 @@ app.get('/', (_req, res) => {
         'GET /api/products/stats',
         'GET /api/products/:slug',
         'GET /api/products/:id/similar',
+        'GET /api/products/barcode/:code',  // ← AJOUTÉ
         'POST /api/products',
+        'POST /api/products/analyze-photos', // ← AJOUTÉ
         'PUT /api/products/:id',
         'DELETE /api/products/:id'
       ],
       tracking: [
-        'GET /api/track/:id'
+        'GET /api/partners/track/:id'  // ← CORRIGÉ
       ],
       ai: [
         'POST /api/eco-score/calculate',
