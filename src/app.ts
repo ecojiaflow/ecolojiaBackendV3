@@ -78,6 +78,53 @@ app.use(helmet({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// 🧪 ROUTES DE TEST DIRECTES - CONTOURNEMENT PROBLÈME RENDER
+app.get('/api/test-barcode', (req: Request, res: Response) => {
+  res.json({ 
+    success: true,
+    message: 'Route barcode test fonctionne !', 
+    timestamp: new Date().toISOString(),
+    source: 'direct-app-ts',
+    note: 'Route de test pour diagnostiquer problème déploiement'
+  });
+});
+
+app.get('/api/products/barcode-direct/:code', (req: Request, res: Response) => {
+  const { code } = req.params;
+  
+  // Validation du code-barres
+  if (!code || code.trim() === '') {
+    return res.status(400).json({
+      success: false,
+      error: "Code-barres requis",
+      barcode: code
+    });
+  }
+
+  const cleanBarcode = code.trim().replace(/[^\d]/g, '');
+  
+  if (cleanBarcode.length < 8) {
+    return res.status(400).json({
+      success: false,
+      error: "Code-barres invalide (minimum 8 chiffres)",
+      barcode: code
+    });
+  }
+
+  console.log(`🔍 [DIRECT] Recherche produit par code-barres: ${cleanBarcode}`);
+  
+  // Simulation réponse pour test
+  res.json({
+    success: false,
+    error: "Produit non trouvé dans notre base de données",
+    barcode: cleanBarcode,
+    suggestion_url: `/product-not-found?barcode=${cleanBarcode}`,
+    message: "Aidez-nous à enrichir notre base en photographiant ce produit",
+    source: 'direct-app-ts-barcode-route',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // ✅ ROUTES API CORRIGÉES
 app.use('/api/products', productRoutes);  // ← CORRIGÉ : était '/api'
 app.use('/api/partners', partnerRoutes);  // ← CORRIGÉ : était '/api' 
@@ -175,6 +222,10 @@ app.get('/', (_req, res) => {
         'POST /api/products/analyze-photos', // ← AJOUTÉ
         'PUT /api/products/:id',
         'DELETE /api/products/:id'
+      ],
+      test: [
+        'GET /api/test-barcode',  // ← ROUTE DE TEST
+        'GET /api/products/barcode-direct/:code'  // ← ROUTE DIRECTE
       ],
       tracking: [
         'GET /api/partners/track/:id'  // ← CORRIGÉ
