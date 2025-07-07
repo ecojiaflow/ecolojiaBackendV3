@@ -7,41 +7,57 @@ dotenv.config();
 
 const app = express();
 
-console.log('🌱 ECOLOJIA Backend - Mode de secours sans Prisma');
+// 🔌 TENTATIVE CONNEXION POSTGRESQL
+let prisma = null;
+let usePostgreSQL = false;
 
-// CORS - MÊME CONFIGURATION
-const allowedOrigins = [
-  'https://frontendv3.netlify.app',
-  'https://ecolojiafrontv3.netlify.app',
-  'https://main--frontendv3.netlify.app',
-  'https://main--ecolojiafrontv3.netlify.app',
-  'https://ecolojiabackendv3.onrender.com',
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://localhost:4173'
-];
-
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || origin.includes('.netlify.app') || allowedOrigins.includes(origin)) {
-      return callback(null, true);
+async function initializePrisma() {
+  try {
+    console.log('🔌 Tentative connexion PostgreSQL...');
+    
+    // Vérifier que DATABASE_URL existe
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL non définie');
     }
-    callback(new Error(`Origin ${origin} not allowed by CORS`));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-key', 'x-api-key', 'X-Requested-With', 'Accept', 'Origin']
-}));
+    
+    console.log('📊 DATABASE_URL configurée:', process.env.DATABASE_URL.substring(0, 50) + '...');
+    
+    const { PrismaClient } = require('@prisma/client');
+    prisma = new PrismaClient({
+      datasources: {
+        db: {
+          url: process.env.DATABASE_URL
+        }
+      }
+    });
+    
+    // Test de connexion
+    await prisma.$connect();
+    const testCount = await prisma.product.count();
+    
+    console.log(`✅ PostgreSQL connectée - ${testCount} produits en base`);
+    usePostgreSQL = true;
+    
+    return true;
+  } catch (error) {
+    console.warn('⚠️ PostgreSQL non disponible:', error.message);
+    console.log('🔄 Basculement vers version secours...');
+    
+    if (prisma) {
+      try {
+        await prisma.$disconnect();
+      } catch (e) {
+        // Ignore disconnect errors
+      }
+    }
+    
+    usePostgreSQL = false;
+    return false;
+  }
+}
 
-app.use(helmet({
-  crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: { policy: "cross-origin" }
-}));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-// 📦 PRODUITS RÉELS IMPORTÉS (simulation des 49 produits importés)
-const realProducts = [
+// 📦 PRODUITS DE SECOURS (49 produits réels)
+const fallbackProducts = [
   {
     id: "real_1",
     title: "Bio Datteln Getrocknet",
@@ -139,12 +155,12 @@ const realProducts = [
   }
 ];
 
-// Générer 44 produits supplémentaires pour atteindre 49
+// Générer 44 produits supplémentaires
 for (let i = 6; i <= 49; i++) {
   const categories = ['alimentaire', 'boissons', 'biscuiterie', 'fruits-légumes', 'produits-laitiers'];
   const category = categories[i % categories.length];
   
-  realProducts.push({
+  fallbackProducts.push({
     id: `real_${i}`,
     title: `Produit Bio Import ${i}`,
     slug: `produit-bio-import-${i}-${1000000 + i}`,
@@ -165,7 +181,36 @@ for (let i = 6; i <= 49; i++) {
   });
 }
 
-console.log(`📦 ${realProducts.length} produits réels chargés`);
+// CORS
+const allowedOrigins = [
+  'https://frontendv3.netlify.app',
+  'https://ecolojiafrontv3.netlify.app',
+  'https://main--frontendv3.netlify.app',
+  'https://main--ecolojiafrontv3.netlify.app',
+  'https://ecolojiabackendv3.onrender.com',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:4173'
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || origin.includes('.netlify.app') || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error(`Origin ${origin} not allowed by CORS`));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-key', 'x-api-key', 'X-Requested-With', 'Accept', 'Origin']
+}));
+
+app.use(helmet({
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
 // 🧪 ROUTE TEST
 app.get('/api/test-barcode', (req, res) => {
@@ -174,133 +219,246 @@ app.get('/api/test-barcode', (req, res) => {
     message: 'Route barcode test fonctionne !', 
     timestamp: new Date().toISOString(),
     source: 'direct-app-js',
+    database: usePostgreSQL ? 'PostgreSQL' : 'Fallback',
     note: 'Route de test JavaScript - MVP débloqué'
   });
 });
 
-// 📦 ROUTE PRODUITS
-app.get('/api/products', (req, res) => {
-  console.log('📋 Récupération produits réels (49 produits)');
-  
-  const { limit = 50, offset = 0, q } = req.query;
-  
-  let results = [...realProducts];
-  
-  if (q && q.trim()) {
-    const query = q.toLowerCase().trim();
-    results = results.filter(product => 
-      product.title.toLowerCase().includes(query) ||
-      product.description.toLowerCase().includes(query) ||
-      product.brand.toLowerCase().includes(query) ||
-      product.tags.some(tag => tag.toLowerCase().includes(query))
-    );
-    console.log(`🔍 Recherche "${query}" : ${results.length} résultats`);
+// 📦 ROUTE PRODUITS - PostgreSQL OU Fallback
+app.get('/api/products', async (req, res) => {
+  try {
+    console.log(`📋 Récupération produits (${usePostgreSQL ? 'PostgreSQL' : 'Fallback'})...`);
+    
+    const { limit = 50, offset = 0, q } = req.query;
+    
+    if (usePostgreSQL && prisma) {
+      // POSTGRESQL
+      const whereClause = {};
+      if (q && q.trim()) {
+        const query = q.toLowerCase().trim();
+        whereClause.OR = [
+          { title: { contains: query, mode: 'insensitive' } },
+          { description: { contains: query, mode: 'insensitive' } },
+          { brand: { contains: query, mode: 'insensitive' } }
+        ];
+      }
+      
+      const products = await prisma.product.findMany({
+        where: whereClause,
+        take: parseInt(limit),
+        skip: parseInt(offset),
+        orderBy: { created_at: 'desc' }
+      });
+
+      const transformedProducts = products.map(product => ({
+        id: product.id,
+        title: product.title,
+        slug: product.slug,
+        description: product.description,
+        brand: product.brand,
+        category: product.category,
+        eco_score: product.eco_score ? Number(product.eco_score).toFixed(2) : "0.50",
+        ai_confidence: product.ai_confidence ? Number(product.ai_confidence).toFixed(2) : "0.70",
+        confidence_pct: product.confidence_pct || 70,
+        confidence_color: product.confidence_color || 'yellow',
+        verified_status: product.verified_status || 'ai_analyzed',
+        tags: product.tags || [],
+        zones_dispo: product.zones_dispo || ['FR'],
+        image_url: product.images?.[0] || `https://via.assets.so/img.jpg?w=300&h=200&tc=green&bg=%23f3f4f6&t=${encodeURIComponent(product.title)}`,
+        prices: product.prices || { default: 0 },
+        resume_fr: product.resume_fr || 'Produit bio référencé'
+      }));
+
+      console.log(`✅ ${transformedProducts.length} produits PostgreSQL`);
+      res.json(transformedProducts);
+    } else {
+      // FALLBACK
+      let results = [...fallbackProducts];
+      
+      if (q && q.trim()) {
+        const query = q.toLowerCase().trim();
+        results = results.filter(product => 
+          product.title.toLowerCase().includes(query) ||
+          product.description.toLowerCase().includes(query) ||
+          product.brand.toLowerCase().includes(query) ||
+          product.tags.some(tag => tag.toLowerCase().includes(query))
+        );
+      }
+      
+      const startIndex = parseInt(offset);
+      const limitNum = parseInt(limit);
+      const paginatedResults = results.slice(startIndex, startIndex + limitNum);
+      
+      console.log(`✅ ${paginatedResults.length} produits fallback`);
+      res.json(paginatedResults);
+    }
+    
+  } catch (error) {
+    console.error('❌ Erreur récupération produits:', error);
+    res.status(500).json({
+      error: 'Erreur de récupération produits',
+      message: error.message
+    });
   }
-  
-  const startIndex = parseInt(offset);
-  const limitNum = parseInt(limit);
-  const paginatedResults = results.slice(startIndex, startIndex + limitNum);
-  
-  console.log(`✅ Retour de ${paginatedResults.length} produits réels`);
-  res.json(paginatedResults);
 });
 
 // 🔍 ROUTE SEARCH
-app.get('/api/products/search', (req, res) => {
-  console.log('🔍 Recherche produits réels:', req.query);
-  
-  const { q, limit = 20 } = req.query;
-  
-  if (!q || q.trim() === '') {
-    return res.json({
-      products: [],
-      count: 0,
-      query: ''
-    });
+app.get('/api/products/search', async (req, res) => {
+  try {
+    const { q, limit = 20 } = req.query;
+    
+    if (!q || q.trim() === '') {
+      return res.json({ products: [], count: 0, query: '' });
+    }
+    
+    const query = q.toLowerCase().trim();
+    
+    if (usePostgreSQL && prisma) {
+      const products = await prisma.product.findMany({
+        where: {
+          OR: [
+            { title: { contains: query, mode: 'insensitive' } },
+            { description: { contains: query, mode: 'insensitive' } },
+            { brand: { contains: query, mode: 'insensitive' } }
+          ]
+        },
+        take: parseInt(limit),
+        orderBy: { eco_score: 'desc' }
+      });
+      
+      const transformedProducts = products.map(product => ({
+        id: product.id,
+        title: product.title,
+        slug: product.slug,
+        brand: product.brand,
+        eco_score: Number(product.eco_score).toFixed(2),
+        image_url: product.images?.[0] || `https://via.assets.so/img.jpg?w=300&h=200&tc=green&bg=%23f3f4f6&t=${encodeURIComponent(product.title)}`
+      }));
+      
+      res.json({ products: transformedProducts, count: transformedProducts.length, query });
+    } else {
+      const results = fallbackProducts.filter(product => 
+        product.title.toLowerCase().includes(query) ||
+        product.description.toLowerCase().includes(query) ||
+        product.brand.toLowerCase().includes(query)
+      ).slice(0, parseInt(limit));
+      
+      res.json({ products: results, count: results.length, query });
+    }
+    
+  } catch (error) {
+    console.error('❌ Erreur search:', error);
+    res.status(500).json({ products: [], count: 0, error: 'Erreur de recherche' });
   }
-  
-  const query = q.toLowerCase().trim();
-  const results = realProducts.filter(product => 
-    product.title.toLowerCase().includes(query) ||
-    product.description.toLowerCase().includes(query) ||
-    product.brand.toLowerCase().includes(query) ||
-    product.tags.some(tag => tag.toLowerCase().includes(query))
-  );
-  
-  const limitedResults = results.slice(0, parseInt(limit));
-  
-  console.log(`🎯 Recherche "${query}" : ${limitedResults.length} résultats`);
-  
-  res.json({
-    products: limitedResults,
-    count: limitedResults.length,
-    query: query
-  });
 });
 
 // 📄 ROUTE SLUG
-app.get('/api/products/:slug', (req, res) => {
-  const { slug } = req.params;
-  console.log(`🔍 Recherche produit par slug: ${slug}`);
-  
-  const product = realProducts.find(p => p.slug === slug || p.id === slug);
-  
-  if (!product) {
-    console.log(`❌ Produit non trouvé: ${slug}`);
-    return res.status(404).json({ error: 'Produit non trouvé' });
+app.get('/api/products/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    
+    if (usePostgreSQL && prisma) {
+      const product = await prisma.product.findUnique({ where: { slug } });
+      
+      if (!product) {
+        return res.status(404).json({ error: 'Produit non trouvé' });
+      }
+      
+      const transformed = {
+        id: product.id,
+        title: product.title,
+        slug: product.slug,
+        description: product.description,
+        brand: product.brand,
+        category: product.category,
+        eco_score: Number(product.eco_score).toFixed(2),
+        barcode: product.barcode,
+        tags: product.tags,
+        image_url: product.images?.[0] || `https://via.assets.so/img.jpg?w=300&h=200&tc=green&bg=%23f3f4f6&t=${encodeURIComponent(product.title)}`
+      };
+      
+      res.json(transformed);
+    } else {
+      const product = fallbackProducts.find(p => p.slug === slug || p.id === slug);
+      
+      if (!product) {
+        return res.status(404).json({ error: 'Produit non trouvé' });
+      }
+      
+      res.json(product);
+    }
+    
+  } catch (error) {
+    console.error('❌ Erreur slug:', error);
+    res.status(500).json({ error: 'Erreur récupération produit' });
   }
-  
-  console.log(`✅ Produit trouvé: ${product.title}`);
-  res.json(product);
 });
 
-// 📊 ROUTE BARCODE - AVEC VRAIS CODES
-app.get('/api/products/barcode/:code', (req, res) => {
-  const { code } = req.params;
-  
-  if (!code || code.trim() === '') {
-    return res.status(400).json({
+// 📊 ROUTE BARCODE
+app.get('/api/products/barcode/:code', async (req, res) => {
+  try {
+    const { code } = req.params;
+    const cleanBarcode = code.trim().replace(/[^\d]/g, '');
+    
+    if (cleanBarcode.length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: "Code-barres invalide",
+        barcode: code
+      });
+    }
+    
+    console.log(`🔍 Recherche barcode: ${cleanBarcode} (${usePostgreSQL ? 'PostgreSQL' : 'Fallback'})`);
+    
+    if (usePostgreSQL && prisma) {
+      const product = await prisma.product.findFirst({
+        where: { barcode: cleanBarcode }
+      });
+      
+      if (product) {
+        return res.json({
+          success: true,
+          product: {
+            id: product.id,
+            title: product.title,
+            slug: product.slug,
+            barcode: product.barcode,
+            eco_score: Number(product.eco_score).toFixed(2)
+          },
+          barcode: cleanBarcode,
+          search_method: 'postgresql_database'
+        });
+      }
+    } else {
+      const product = fallbackProducts.find(p => p.barcode === cleanBarcode);
+      
+      if (product) {
+        return res.json({
+          success: true,
+          product: product,
+          barcode: cleanBarcode,
+          search_method: 'fallback_database'
+        });
+      }
+    }
+    
+    // Produit non trouvé
+    res.status(404).json({
       success: false,
-      error: "Code-barres requis",
-      barcode: code
-    });
-  }
-
-  const cleanBarcode = code.trim().replace(/[^\d]/g, '');
-  
-  if (cleanBarcode.length < 8) {
-    return res.status(400).json({
-      success: false,
-      error: "Code-barres invalide (minimum 8 chiffres)",
-      barcode: code
-    });
-  }
-
-  console.log(`🔍 Recherche par code-barres: ${cleanBarcode}`);
-  
-  // Rechercher dans les produits réels
-  const product = realProducts.find(p => p.barcode === cleanBarcode);
-  
-  if (product) {
-    console.log(`✅ Produit trouvé par code-barres: ${product.title}`);
-    return res.json({
-      success: true,
-      product: product,
+      error: "Produit non trouvé dans notre base de données",
       barcode: cleanBarcode,
-      search_method: 'real_products_database'
+      suggestion_url: `/product-not-found?barcode=${cleanBarcode}`,
+      message: "Aidez-nous à enrichir notre base en photographiant ce produit"
+    });
+    
+  } catch (error) {
+    console.error('❌ Erreur barcode:', error);
+    res.status(500).json({
+      success: false,
+      error: "Erreur lors de la recherche",
+      message: error.message
     });
   }
-  
-  // Produit non trouvé
-  console.log(`❌ Produit non trouvé pour code-barres: ${cleanBarcode}`);
-  res.status(404).json({
-    success: false,
-    error: "Produit non trouvé dans notre base de données",
-    barcode: cleanBarcode,
-    suggestion_url: `/product-not-found?barcode=${cleanBarcode}`,
-    message: "Aidez-nous à enrichir notre base en photographiant ce produit",
-    timestamp: new Date().toISOString()
-  });
 });
 
 // 📸 ROUTE ANALYSE PHOTOS
@@ -314,58 +472,61 @@ app.post('/api/products/analyze-photos', (req, res) => {
     });
   }
 
-  console.log(`📸 Analyse photos pour code-barres: ${barcode}`);
-  
-  const mockProduct = {
-    id: `product_${Date.now()}`,
-    title: "Produit Éco Analysé",
-    brand: "EcoBrand",
-    category: "Cosmétique",
-    eco_score: 75,
-    slug: `produit-eco-${Date.now()}`
-  };
-
   res.json({
     success: true,
     message: "Produit analysé et créé avec succès",
-    productId: mockProduct.id,
-    productSlug: mockProduct.slug,
-    productName: mockProduct.title,
-    ecoScore: mockProduct.eco_score,
-    redirect_url: `/product/${mockProduct.slug}`,
+    productName: "Produit Éco Analysé",
+    ecoScore: 75,
+    redirect_url: `/product/produit-eco-${Date.now()}`,
     timestamp: new Date().toISOString()
   });
 });
 
 // 🏠 ROOT ENDPOINT
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Ecolojia API - MVP FONCTIONNEL',
-    version: '1.0.0',
-    status: 'operational',
-    environment: process.env.NODE_ENV || 'production',
-    timestamp: new Date().toISOString(),
-    mvp_status: 'DÉBLOQUÉ - Routes barcode + 49 produits réels',
-    products_count: realProducts.length,
-    database: 'Produits réels importés ✅',
-    note: 'Version de secours sans Prisma',
-    endpoints: {
-      products: [
-        'GET /api/products ✅',
-        'GET /api/products/search ✅', 
-        'GET /api/products/:slug ✅',
-        'GET /api/products/barcode/:code ✅',
-        'POST /api/products/analyze-photos ✅'
-      ],
-      test: [
-        'GET /api/test-barcode ✅'
-      ],
-      health: [
-        'GET /health ✅',
-        'GET /api/health ✅'
-      ]
+app.get('/', async (req, res) => {
+  try {
+    let productCount = fallbackProducts.length;
+    let databaseStatus = 'Fallback (49 produits réels)';
+    
+    if (usePostgreSQL && prisma) {
+      try {
+        productCount = await prisma.product.count();
+        databaseStatus = 'PostgreSQL connectée ✅';
+      } catch (error) {
+        console.warn('⚠️ Erreur count PostgreSQL:', error.message);
+      }
     }
-  });
+    
+    res.json({
+      message: 'Ecolojia API - MVP FONCTIONNEL',
+      version: '1.0.0',
+      status: 'operational',
+      environment: process.env.NODE_ENV || 'production',
+      timestamp: new Date().toISOString(),
+      mvp_status: `DÉBLOQUÉ - Routes barcode + ${productCount} produits réels`,
+      products_count: productCount,
+      database: databaseStatus,
+      postgresql_enabled: usePostgreSQL,
+      endpoints: {
+        products: [
+          'GET /api/products ✅',
+          'GET /api/products/search ✅', 
+          'GET /api/products/:slug ✅',
+          'GET /api/products/barcode/:code ✅',
+          'POST /api/products/analyze-photos ✅'
+        ],
+        test: ['GET /api/test-barcode ✅'],
+        health: ['GET /health ✅', 'GET /api/health ✅']
+      }
+    });
+  } catch (error) {
+    res.json({
+      message: 'Ecolojia API - Erreur status',
+      error: error.message,
+      products_count: fallbackProducts.length,
+      database: 'Fallback uniquement'
+    });
+  }
 });
 
 // 🏥 HEALTH CHECKS
@@ -375,6 +536,26 @@ app.get('/health', (req, res) => {
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// 🔌 INITIALISATION AU DÉMARRAGE
+initializePrisma().then((success) => {
+  if (success) {
+    console.log('🎉 PostgreSQL initialisée avec succès');
+  } else {
+    console.log('🔄 Mode fallback activé (49 produits)');
+  }
+}).catch((error) => {
+  console.error('❌ Erreur initialisation:', error);
+  console.log('🔄 Mode fallback par défaut');
+});
+
+// Nettoyage à la fermeture
+process.on('beforeExit', async () => {
+  if (prisma) {
+    console.log('🔌 Fermeture connexion PostgreSQL...');
+    await prisma.$disconnect();
+  }
 });
 
 module.exports = app;
