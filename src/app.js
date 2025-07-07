@@ -2,12 +2,17 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const dotenv = require('dotenv');
+const { PrismaClient } = require('@prisma/client');
 
 dotenv.config();
 
 const app = express();
+const prisma = new PrismaClient();
 
-// CORS
+console.log('🌱 ECOLOJIA Backend - Démarrage avec PostgreSQL');
+console.log('📊 Connexion Prisma en cours...');
+
+// CORS - MÊME CONFIGURATION QUE VOTRE VERSION
 const allowedOrigins = [
   'https://frontendv3.netlify.app',
   'https://ecolojiafrontv3.netlify.app',
@@ -31,7 +36,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-key', 'x-api-key', 'X-Requested-With', 'Accept', 'Origin']
 }));
 
-// Middlewares
+// Middlewares - MÊME CONFIGURATION QUE VOTRE VERSION
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
   crossOriginResourcePolicy: { policy: "cross-origin" }
@@ -39,174 +44,7 @@ app.use(helmet({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// SIMULATION BASE DE DONNÉES - Produits mock
-const mockProducts = [
-  {
-    id: "prod_1",
-    title: "Shampooing Bio Lavande",
-    slug: "shampooing-bio-lavande",
-    description: "Shampooing naturel à la lavande bio, sans sulfates",
-    brand: "EcoNature",
-    category: "cosmétique",
-    eco_score: "0.85",
-    ai_confidence: "0.9",
-    confidence_pct: 90,
-    confidence_color: "green",
-    verified_status: "verified",
-    tags: ["bio", "naturel", "lavande", "sans-sulfate"],
-    zones_dispo: ["FR", "EU"],
-    image_url: "https://via.assets.so/img.jpg?w=300&h=200&tc=green&bg=%23f3f4f6&t=Shampooing%20Bio",
-    prices: { default: 12.99, EUR: 12.99 },
-    resume_fr: "Shampooing doux pour tous types de cheveux"
-  },
-  {
-    id: "prod_2", 
-    title: "Dentifrice Menthe Naturel",
-    slug: "dentifrice-menthe-naturel",
-    description: "Dentifrice bio à la menthe, tube recyclable",
-    brand: "DentVert",
-    category: "hygiène",
-    eco_score: "0.78",
-    ai_confidence: "0.85",
-    confidence_pct: 85,
-    confidence_color: "green",
-    verified_status: "ai_verified",
-    tags: ["bio", "menthe", "recyclable", "naturel"],
-    zones_dispo: ["FR", "EU"],
-    image_url: "https://via.assets.so/img.jpg?w=300&h=200&tc=mint&bg=%23f3f4f6&t=Dentifrice%20Bio",
-    prices: { default: 8.50, EUR: 8.50 },
-    resume_fr: "Protection naturelle pour vos dents"
-  },
-  {
-    id: "prod_3",
-    title: "Savon Artisanal Karité", 
-    slug: "savon-artisanal-karite",
-    description: "Savon surgras au beurre de karité, fabriqué en France",
-    brand: "Savonnerie du Sud",
-    category: "cosmétique",
-    eco_score: "0.92",
-    ai_confidence: "0.95",
-    confidence_pct: 95,
-    confidence_color: "green", 
-    verified_status: "verified",
-    tags: ["artisanal", "karité", "france", "surgras"],
-    zones_dispo: ["FR"],
-    image_url: "https://via.assets.so/img.jpg?w=300&h=200&tc=orange&bg=%23f3f4f6&t=Savon%20Karite",
-    prices: { default: 6.90, EUR: 6.90 },
-    resume_fr: "Douceur et hydratation naturelle"
-  },
-  {
-    id: "prod_4",
-    title: "Crème Visage Aloe Vera",
-    slug: "creme-visage-aloe-vera", 
-    description: "Crème hydratante à l'aloe vera bio, peaux sensibles",
-    brand: "BioBeauté",
-    category: "cosmétique",
-    eco_score: "0.81",
-    ai_confidence: "0.88",
-    confidence_pct: 88,
-    confidence_color: "green",
-    verified_status: "verified",
-    tags: ["aloe", "hydratant", "peaux-sensibles", "bio"],
-    zones_dispo: ["FR", "EU", "US"],
-    image_url: "https://via.assets.so/img.jpg?w=300&h=200&tc=green&bg=%23f3f4f6&t=Creme%20Aloe",
-    prices: { default: 24.90, EUR: 24.90 },
-    resume_fr: "Hydratation intense et apaisante"
-  },
-  {
-    id: "prod_5",
-    title: "Huile d'Olive Extra Vierge",
-    slug: "huile-olive-extra-vierge",
-    description: "Huile d'olive bio première pression à froid",
-    brand: "Oliviers de Provence", 
-    category: "alimentaire",
-    eco_score: "0.89",
-    ai_confidence: "0.92",
-    confidence_pct: 92,
-    confidence_color: "green",
-    verified_status: "verified",
-    tags: ["bio", "olive", "première-pression", "provence"],
-    zones_dispo: ["FR", "EU"],
-    image_url: "https://via.assets.so/img.jpg?w=300&h=200&tc=yellow&bg=%23f3f4f6&t=Huile%20Olive",
-    prices: { default: 18.50, EUR: 18.50 },
-    resume_fr: "Saveur authentique de Provence"
-  }
-];
-
-// ROUTES PRODUITS - Ce qui manquait !
-app.get('/api/products', (req, res) => {
-  console.log('📋 Récupération liste des produits');
-  
-  const { limit = 50, offset = 0, q } = req.query;
-  
-  let results = [...mockProducts];
-  
-  // Recherche simple
-  if (q && q.trim()) {
-    const query = q.toLowerCase().trim();
-    results = results.filter(product => 
-      product.title.toLowerCase().includes(query) ||
-      product.description.toLowerCase().includes(query) ||
-      product.brand.toLowerCase().includes(query) ||
-      product.tags.some(tag => tag.toLowerCase().includes(query))
-    );
-    console.log(`🔍 Recherche "${query}" : ${results.length} résultats`);
-  }
-  
-  // Pagination
-  const startIndex = parseInt(offset);
-  const limitNum = parseInt(limit);
-  const paginatedResults = results.slice(startIndex, startIndex + limitNum);
-  
-  console.log(`✅ Retour de ${paginatedResults.length} produits`);
-  
-  res.json(paginatedResults);
-});
-
-app.get('/api/products/search', (req, res) => {
-  console.log('🔍 Recherche produits:', req.query);
-  
-  const { q, limit = 20 } = req.query;
-  
-  if (!q || q.trim() === '') {
-    return res.json([]);
-  }
-  
-  const query = q.toLowerCase().trim();
-  const results = mockProducts.filter(product => 
-    product.title.toLowerCase().includes(query) ||
-    product.description.toLowerCase().includes(query) ||
-    product.brand.toLowerCase().includes(query) ||
-    product.tags.some(tag => tag.toLowerCase().includes(query))
-  );
-  
-  const limitedResults = results.slice(0, parseInt(limit));
-  
-  console.log(`🎯 Recherche "${query}" : ${limitedResults.length} résultats`);
-  
-  res.json({
-    products: limitedResults,
-    count: limitedResults.length,
-    query: query
-  });
-});
-
-app.get('/api/products/:slug', (req, res) => {
-  const { slug } = req.params;
-  console.log(`🔍 Recherche produit par slug: ${slug}`);
-  
-  const product = mockProducts.find(p => p.slug === slug || p.id === slug);
-  
-  if (!product) {
-    console.log(`❌ Produit non trouvé: ${slug}`);
-    return res.status(404).json({ error: 'Produit non trouvé' });
-  }
-  
-  console.log(`✅ Produit trouvé: ${product.title}`);
-  res.json(product);
-});
-
-// ROUTES DE TEST DIRECTES
+// 🧪 ROUTE TEST BARCODE - IDENTIQUE À VOTRE VERSION
 app.get('/api/test-barcode', (req, res) => {
   res.json({ 
     success: true,
@@ -217,40 +55,262 @@ app.get('/api/test-barcode', (req, res) => {
   });
 });
 
-app.get('/api/products/barcode/:code', (req, res) => {
-  const { code } = req.params;
-  
-  if (!code || code.trim() === '') {
-    return res.status(400).json({
-      success: false,
-      error: "Code-barres requis",
-      barcode: code
+// 📦 ROUTE PRODUITS - MAINTENANT AVEC POSTGRESQL AU LIEU DE MOCK
+app.get('/api/products', async (req, res) => {
+  try {
+    console.log('📋 Récupération produits depuis PostgreSQL...');
+    
+    const { limit = 50, offset = 0, q } = req.query;
+    
+    // Construire la requête Prisma
+    const whereClause = {};
+    if (q && q.trim()) {
+      const query = q.toLowerCase().trim();
+      whereClause.OR = [
+        { title: { contains: query, mode: 'insensitive' } },
+        { description: { contains: query, mode: 'insensitive' } },
+        { brand: { contains: query, mode: 'insensitive' } }
+      ];
+      console.log(`🔍 Recherche "${query}" en PostgreSQL`);
+    }
+    
+    // Récupérer depuis PostgreSQL
+    const products = await prisma.product.findMany({
+      where: whereClause,
+      take: parseInt(limit),
+      skip: parseInt(offset),
+      orderBy: {
+        created_at: 'desc'
+      }
+    });
+
+    console.log(`✅ ${products.length} produits récupérés depuis PostgreSQL`);
+
+    // Transformer pour le frontend (même format que vos produits mock)
+    const transformedProducts = products.map(product => ({
+      id: product.id,
+      title: product.title,
+      slug: product.slug,
+      description: product.description,
+      brand: product.brand,
+      category: product.category,
+      eco_score: product.eco_score ? Number(product.eco_score).toFixed(2) : "0.50",
+      ai_confidence: product.ai_confidence ? Number(product.ai_confidence).toFixed(2) : "0.70",
+      confidence_pct: product.confidence_pct || 70,
+      confidence_color: product.confidence_color || 'yellow',
+      verified_status: product.verified_status || 'ai_analyzed',
+      tags: product.tags || [],
+      zones_dispo: product.zones_dispo || ['FR'],
+      image_url: product.images?.[0] || `https://via.assets.so/img.jpg?w=300&h=200&tc=green&bg=%23f3f4f6&t=${encodeURIComponent(product.title)}`,
+      prices: product.prices || { default: 0 },
+      resume_fr: product.resume_fr || 'Produit bio référencé'
+    }));
+
+    res.json(transformedProducts);
+
+  } catch (error) {
+    console.error('❌ Erreur PostgreSQL:', error);
+    
+    // Fallback vers message d'erreur informatif
+    res.status(500).json({
+      error: 'Erreur de connexion PostgreSQL',
+      message: error.message,
+      fallback: 'Vérifiez DATABASE_URL dans les variables d\'environnement'
     });
   }
-
-  const cleanBarcode = code.trim().replace(/[^\d]/g, '');
-  
-  if (cleanBarcode.length < 8) {
-    return res.status(400).json({
-      success: false,
-      error: "Code-barres invalide (minimum 8 chiffres)",
-      barcode: code
-    });
-  }
-
-  console.log(`🔍 Recherche produit par code-barres: ${cleanBarcode}`);
-  
-  // SIMULATION - Route barcode fonctionnelle
-  res.json({
-    success: false,
-    error: "Produit non trouvé dans notre base de données",
-    barcode: cleanBarcode,
-    suggestion_url: `/product-not-found?barcode=${cleanBarcode}`,
-    message: "Aidez-nous à enrichir notre base en photographiant ce produit",
-    timestamp: new Date().toISOString()
-  });
 });
 
+// 🔍 ROUTE SEARCH - POSTGRESQL
+app.get('/api/products/search', async (req, res) => {
+  try {
+    console.log('🔍 Recherche produits PostgreSQL:', req.query);
+    
+    const { q, limit = 20 } = req.query;
+    
+    if (!q || q.trim() === '') {
+      return res.json({
+        products: [],
+        count: 0,
+        query: ''
+      });
+    }
+    
+    const query = q.toLowerCase().trim();
+    
+    const products = await prisma.product.findMany({
+      where: {
+        OR: [
+          { title: { contains: query, mode: 'insensitive' } },
+          { description: { contains: query, mode: 'insensitive' } },
+          { brand: { contains: query, mode: 'insensitive' } }
+        ]
+      },
+      take: parseInt(limit),
+      orderBy: {
+        eco_score: 'desc'
+      }
+    });
+    
+    const transformedProducts = products.map(product => ({
+      id: product.id,
+      title: product.title,
+      slug: product.slug,
+      description: product.description,
+      brand: product.brand,
+      category: product.category,
+      eco_score: product.eco_score ? Number(product.eco_score).toFixed(2) : "0.50",
+      confidence_pct: product.confidence_pct || 70,
+      image_url: product.images?.[0] || `https://via.assets.so/img.jpg?w=300&h=200&tc=green&bg=%23f3f4f6&t=${encodeURIComponent(product.title)}`,
+      resume_fr: product.resume_fr || 'Produit bio référencé'
+    }));
+    
+    console.log(`🎯 Recherche "${query}" : ${transformedProducts.length} résultats PostgreSQL`);
+    
+    res.json({
+      products: transformedProducts,
+      count: transformedProducts.length,
+      query: query
+    });
+    
+  } catch (error) {
+    console.error('❌ Erreur recherche PostgreSQL:', error);
+    res.status(500).json({
+      products: [],
+      count: 0,
+      error: 'Erreur de recherche'
+    });
+  }
+});
+
+// 📄 ROUTE PRODUIT PAR SLUG - POSTGRESQL
+app.get('/api/products/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    console.log(`🔍 Recherche produit par slug PostgreSQL: ${slug}`);
+    
+    const product = await prisma.product.findUnique({
+      where: { slug: slug }
+    });
+    
+    if (!product) {
+      console.log(`❌ Produit non trouvé PostgreSQL: ${slug}`);
+      return res.status(404).json({ error: 'Produit non trouvé' });
+    }
+    
+    const transformedProduct = {
+      id: product.id,
+      title: product.title,
+      slug: product.slug,
+      description: product.description,
+      brand: product.brand,
+      category: product.category,
+      eco_score: product.eco_score ? Number(product.eco_score).toFixed(2) : "0.50",
+      ai_confidence: product.ai_confidence ? Number(product.ai_confidence).toFixed(2) : "0.70",
+      confidence_pct: product.confidence_pct || 70,
+      confidence_color: product.confidence_color || 'yellow',
+      verified_status: product.verified_status || 'ai_analyzed',
+      tags: product.tags || [],
+      zones_dispo: product.zones_dispo || ['FR'],
+      image_url: product.images?.[0] || `https://via.assets.so/img.jpg?w=300&h=200&tc=green&bg=%23f3f4f6&t=${encodeURIComponent(product.title)}`,
+      prices: product.prices || { default: 0 },
+      resume_fr: product.resume_fr || 'Produit bio référencé',
+      barcode: product.barcode
+    };
+    
+    console.log(`✅ Produit trouvé PostgreSQL: ${product.title}`);
+    res.json(transformedProduct);
+    
+  } catch (error) {
+    console.error('❌ Erreur récupération produit PostgreSQL:', error);
+    res.status(500).json({ error: 'Erreur de récupération produit' });
+  }
+});
+
+// 📊 ROUTE BARCODE - POSTGRESQL (VRAIS CODES!)
+app.get('/api/products/barcode/:code', async (req, res) => {
+  try {
+    const { code } = req.params;
+    
+    if (!code || code.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: "Code-barres requis",
+        barcode: code
+      });
+    }
+
+    const cleanBarcode = code.trim().replace(/[^\d]/g, '');
+    
+    if (cleanBarcode.length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: "Code-barres invalide (minimum 8 chiffres)",
+        barcode: code
+      });
+    }
+
+    console.log(`🔍 Recherche par code-barres PostgreSQL: ${cleanBarcode}`);
+    
+    // Rechercher dans PostgreSQL
+    const product = await prisma.product.findFirst({
+      where: {
+        barcode: cleanBarcode
+      }
+    });
+
+    if (product) {
+      console.log(`✅ Produit trouvé par code-barres: ${product.title}`);
+      
+      const transformedProduct = {
+        id: product.id,
+        title: product.title,
+        slug: product.slug,
+        description: product.description,
+        brand: product.brand,
+        category: product.category,
+        eco_score: product.eco_score ? Number(product.eco_score).toFixed(2) : "0.50",
+        ai_confidence: product.ai_confidence ? Number(product.ai_confidence).toFixed(2) : "0.70",
+        confidence_pct: product.confidence_pct || 70,
+        confidence_color: product.confidence_color || 'yellow',
+        verified_status: product.verified_status || 'ai_analyzed',
+        tags: product.tags || [],
+        zones_dispo: product.zones_dispo || ['FR'],
+        image_url: product.images?.[0] || `https://via.assets.so/img.jpg?w=300&h=200&tc=green&bg=%23f3f4f6&t=${encodeURIComponent(product.title)}`,
+        prices: product.prices || { default: 0 },
+        resume_fr: product.resume_fr || 'Produit bio référencé',
+        barcode: product.barcode
+      };
+
+      return res.json({
+        success: true,
+        product: transformedProduct,
+        barcode: cleanBarcode,
+        search_method: 'postgresql_database'
+      });
+    }
+    
+    // Produit non trouvé
+    console.log(`❌ Produit non trouvé pour code-barres: ${cleanBarcode}`);
+    res.status(404).json({
+      success: false,
+      error: "Produit non trouvé dans notre base de données",
+      barcode: cleanBarcode,
+      suggestion_url: `/product-not-found?barcode=${cleanBarcode}`,
+      message: "Aidez-nous à enrichir notre base en photographiant ce produit",
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Erreur recherche barcode PostgreSQL:', error);
+    res.status(500).json({
+      success: false,
+      error: "Erreur lors de la recherche",
+      message: error.message
+    });
+  }
+});
+
+// 📸 ROUTE ANALYSE PHOTOS - IDENTIQUE À VOTRE VERSION
 app.post('/api/products/analyze-photos', (req, res) => {
   const { barcode, photos } = req.body;
 
@@ -285,7 +345,52 @@ app.post('/api/products/analyze-photos', (req, res) => {
   });
 });
 
-// Health check
+// 🏠 ROOT ENDPOINT - AVEC VRAI COMPTE POSTGRESQL
+app.get('/', async (req, res) => {
+  try {
+    // Compter les VRAIS produits PostgreSQL
+    const productCount = await prisma.product.count();
+    
+    console.log(`📊 Nombre de produits PostgreSQL: ${productCount}`);
+    
+    res.json({
+      message: 'Ecolojia API - MVP FONCTIONNEL',
+      version: '1.0.0',
+      status: 'operational',
+      environment: process.env.NODE_ENV || 'production',
+      timestamp: new Date().toISOString(),
+      mvp_status: 'DÉBLOQUÉ - Routes barcode + produits PostgreSQL',
+      products_count: productCount, // VRAI COMPTE depuis PostgreSQL !
+      database: 'PostgreSQL connectée ✅',
+      endpoints: {
+        products: [
+          'GET /api/products ✅',
+          'GET /api/products/search ✅', 
+          'GET /api/products/:slug ✅',
+          'GET /api/products/barcode/:code ✅',
+          'POST /api/products/analyze-photos ✅'
+        ],
+        test: [
+          'GET /api/test-barcode ✅'
+        ],
+        health: [
+          'GET /health ✅',
+          'GET /api/health ✅'
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('❌ Erreur connexion PostgreSQL:', error);
+    res.json({
+      message: 'Ecolojia API - ERREUR PostgreSQL',
+      error: error.message,
+      products_count: 0,
+      database: 'PostgreSQL déconnectée ❌'
+    });
+  }
+});
+
+// 🏥 HEALTH CHECKS - IDENTIQUES À VOTRE VERSION
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
@@ -294,33 +399,10 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Root endpoint
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Ecolojia API - MVP FONCTIONNEL',
-    version: '1.0.0',
-    status: 'operational',
-    environment: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString(),
-    mvp_status: 'DÉBLOQUÉ - Routes barcode + produits fonctionnelles',
-    products_count: mockProducts.length,
-    endpoints: {
-      products: [
-        'GET /api/products ✅',
-        'GET /api/products/search ✅', 
-        'GET /api/products/:slug ✅',
-        'GET /api/products/barcode/:code ✅',
-        'POST /api/products/analyze-photos ✅'
-      ],
-      test: [
-        'GET /api/test-barcode ✅'
-      ],
-      health: [
-        'GET /health ✅',
-        'GET /api/health ✅'
-      ]
-    }
-  });
+// Nettoyage Prisma à la fermeture
+process.on('beforeExit', async () => {
+  console.log('🔌 Fermeture connexion PostgreSQL...');
+  await prisma.$disconnect();
 });
 
 module.exports = app;
