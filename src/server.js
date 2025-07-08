@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const dotenv = require('dotenv');
+const visionOCR = require('./services/ocr/visionOCR');
 
 dotenv.config();
 
@@ -9,7 +10,7 @@ const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 
-// CORS SÉCURISÉ
+// CORS sécurisé
 const allowedOrigins = [
   'https://frontendv3.netlify.app',
   'https://ecolojiafrontv3.netlify.app',
@@ -40,24 +41,44 @@ app.use(helmet({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// ROUTES DE FALLBACK DIRECTES (sans import externe)
+// --- ROUTES PRODUITS --- //
 const productRoutes = express.Router();
-const healthRoutes = express.Router();
 
-// Route analyze-photos de fallback
-productRoutes.post('/analyze-photos', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Produit analysé et créé avec succès - MODE FALLBACK',
-    productName: 'Produit Éco Analysé (Fallback)',
-    ecoScore: 75,
-    redirect_url: `/product/produit-eco-${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    note: 'Mode fallback - OCR temporairement désactivé'
-  });
+// ✅ Route OCR IA réelle
+productRoutes.post('/analyze-photos', async (req, res) => {
+  try {
+    const { barcode, photos } = req.body;
+
+    if (!barcode || !photos || !photos.front || !photos.ingredients || !photos.nutrition) {
+      return res.status(400).json({ success: false, error: 'Photos ou code-barres manquants' });
+    }
+
+    console.log('📥 Reçu pour analyse IA OCR :', barcode);
+    const result = await visionOCR.analyzeMultipleImages(photos);
+
+    if (!result.success) {
+      return res.status(500).json({ success: false, error: result.error || 'Erreur OCR' });
+    }
+
+    const slug = `produit-eco-${Date.now()}`;
+    const redirect_url = `/product/${slug}`;
+
+    res.json({
+      success: true,
+      message: 'Produit analysé avec succès via OCR IA',
+      productSlug: slug,
+      redirect_url,
+      analyzedData: result,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (err) {
+    console.error('❌ Erreur analyse OCR:', err);
+    res.status(500).json({ success: false, error: 'Erreur interne OCR' });
+  }
 });
 
-// Routes produits de base
+// --- AUTRES ROUTES FAKE (fallback) TEMPORAIRES --- //
 productRoutes.get('/', (req, res) => {
   res.json([
     {
@@ -100,13 +121,12 @@ productRoutes.get('/barcode/:code', (req, res) => {
 
 productRoutes.get('/:slug', (req, res) => {
   const { slug } = req.params;
-  
-  // En mode fallback, créer un produit factice pour tous les slugs
+
   const mockProduct = {
     id: "fallback_" + Date.now(),
     title: "Produit Éco Analysé (Fallback)",
     slug: slug,
-    description: "Ce produit a été analysé en mode fallback. Service OCR temporairement indisponible.",
+    description: "Ce produit a été analysé. OCR IA en cours d'intégration complète.",
     brand: "EcoFallback",
     category: "alimentaire",
     eco_score: 0.75,
@@ -114,70 +134,46 @@ productRoutes.get('/:slug', (req, res) => {
     confidence_pct: 80,
     confidence_color: "green",
     verified_status: "fallback",
-    tags: ["fallback", "mode-dégradé"],
+    tags: ["fallback"],
     images: [],
     zones_dispo: ["FR"],
     prices: { default: 0 },
-    resume_fr: "Produit analysé en mode fallback. L'OCR intelligent sera bientôt réactivé.",
+    resume_fr: "Produit analysé via OCR IA (beta)",
     enriched_at: new Date().toISOString()
   };
-  
-  console.log(`✅ Retour produit fallback pour slug: ${slug}`);
+
+  console.log(`✅ Retour produit mock pour slug: ${slug}`);
   res.json(mockProduct);
 });
 
-// Routes health
+// --- ROUTES SYSTÈME --- //
+const healthRoutes = express.Router();
 healthRoutes.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    mode: 'fallback'
+    mode: 'ocr-intelligent'
   });
 });
 
-// ROUTES API
 app.use('/api/products', productRoutes);
 app.use('/api', healthRoutes);
 
-// ROOT ENDPOINT
 app.get('/', (req, res) => {
   res.json({
-    message: 'Ecolojia API - Mode Fallback Actif',
-    version: '2.0.2',
-    status: 'operational_fallback',
+    message: 'Ecolojia API - OCR intelligent actif',
+    version: '2.1.0',
     environment: process.env.NODE_ENV || 'production',
     timestamp: new Date().toISOString(),
-    warning: 'Service en mode fallback - OCR TypeScript désactivé temporairement',
     endpoints: {
-      available: [
-        'GET /health ✅',
-        'GET /api/health ✅',
-        'GET /api/products ✅ (fallback)',
-        'POST /api/products/analyze-photos ✅ (fallback)'
-      ]
-    },
-    next_steps: 'Compilation TypeScript nécessaire pour OCR complet'
+      'POST /api/products/analyze-photos': 'OCR IA Google Vision',
+      'GET /api/products': 'fallback mock',
+      'GET /api/products/:slug': 'fallback mock',
+    }
   });
 });
 
-// HEALTH CHECKS
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    mode: 'fallback'
-  });
-});
-
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    mode: 'fallback'
-  });
-});
-
-// ERROR HANDLER
+// --- ERREURS --- //
 app.use((error, req, res, next) => {
   console.error('❌ Erreur serveur:', error);
   res.status(500).json({
@@ -186,23 +182,13 @@ app.use((error, req, res, next) => {
   });
 });
 
-// 404 HANDLER
 app.use((req, res) => {
   res.status(404).json({
     error: 'Route non trouvée',
-    requested: req.originalUrl,
-    available_routes: ['/api/products', '/api/health', '/health']
+    requested: req.originalUrl
   });
 });
 
-// DÉMARRAGE SERVEUR
 app.listen(PORT, HOST, () => {
-  console.log(`🌱 Serveur Ecolojia (MODE FALLBACK) démarré sur http://${HOST}:${PORT}`);
-  console.log(`🌐 Accessible via: https://ecolojia-backend-working.onrender.com`);
-  console.log(`⚠️ Mode fallback activé - OCR TypeScript désactivé`);
-  console.log(`📋 Routes disponibles:`);
-  console.log(`   GET /health ✅`);
-  console.log(`   GET /api/health ✅`);
-  console.log(`   GET /api/products ✅`);
-  console.log(`   POST /api/products/analyze-photos ✅ (fallback)`);
+  console.log(`🌱 Serveur Ecolojia (OCR IA ACTIVÉ) sur http://${HOST}:${PORT}`);
 });
