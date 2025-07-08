@@ -40,9 +40,51 @@ app.use(helmet({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// IMPORT DES ROUTES TYPESCRIPT/PRISMA
-const productRoutes = require('./routes/product.routes');
-const healthRoutes = require('./routes/health.routes');
+// IMPORT DES ROUTES avec try/catch pour debugging
+let productRoutes, healthRoutes;
+
+try {
+  // Essayer d'importer les routes TypeScript compilées ou JS
+  productRoutes = require('./routes/product.routes.js');
+} catch (error) {
+  try {
+    productRoutes = require('./routes/product.routes.ts');
+  } catch (error2) {
+    try {
+      productRoutes = require('./routes/product.routes');
+    } catch (error3) {
+      console.error('❌ Impossible d\'importer product.routes:', error3.message);
+      // Route de fallback
+      productRoutes = express.Router();
+      productRoutes.post('/analyze-photos', (req, res) => {
+        res.status(503).json({
+          success: false,
+          error: 'Service temporairement indisponible',
+          message: 'Routes TypeScript non compilées'
+        });
+      });
+    }
+  }
+}
+
+try {
+  healthRoutes = require('./routes/health.routes.js');
+} catch (error) {
+  try {
+    healthRoutes = require('./routes/health.routes.ts');
+  } catch (error2) {
+    try {
+      healthRoutes = require('./routes/health.routes');
+    } catch (error3) {
+      console.error('❌ Impossible d\'importer health.routes:', error3.message);
+      // Route de fallback
+      healthRoutes = express.Router();
+      healthRoutes.get('/health', (req, res) => {
+        res.json({ status: 'ok', timestamp: new Date().toISOString() });
+      });
+    }
+  }
+}
 
 // ROUTES API
 app.use('/api/products', productRoutes);
@@ -51,27 +93,25 @@ app.use('/api', healthRoutes);
 // ROOT ENDPOINT
 app.get('/', (req, res) => {
   res.json({
-    message: 'Ecolojia API - OCR Intelligent Activé',
-    version: '2.0.0',
+    message: 'Ecolojia API - Débogage Routes',
+    version: '2.0.1',
     status: 'operational',
     environment: process.env.NODE_ENV || 'production',
     timestamp: new Date().toISOString(),
-    features: {
-      ocr_google_vision: '✅ Actif',
-      multi_photo_analysis: '✅ Actif',
-      intelligent_extraction: '✅ Actif',
-      eco_score_calculation: '✅ Actif',
-      prisma_database: '✅ Actif'
+    debug: {
+      routes_loaded: {
+        product_routes: productRoutes ? 'loaded' : 'failed',
+        health_routes: healthRoutes ? 'loaded' : 'failed'
+      },
+      node_version: process.version,
+      working_directory: process.cwd()
     },
     endpoints: {
-      products: [
-        'GET /api/products ✅',
-        'GET /api/products/search ✅', 
-        'GET /api/products/:slug ✅',
-        'GET /api/products/barcode/:code ✅',
-        'POST /api/products/analyze-photos ✅ OCR INTELLIGENT'
-      ],
-      health: ['GET /health ✅', 'GET /api/health ✅']
+      available: [
+        'GET /health ✅',
+        'GET /api/health ✅',
+        'POST /api/products/analyze-photos ⚠️ (peut être indisponible)'
+      ]
     }
   });
 });
@@ -81,8 +121,10 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    ocr_status: 'intelligent_active',
-    database: 'prisma_postgresql'
+    routes_status: {
+      product_routes: productRoutes ? 'loaded' : 'failed',
+      health_routes: healthRoutes ? 'loaded' : 'failed'
+    }
   });
 });
 
@@ -90,8 +132,10 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    ocr_status: 'intelligent_active',
-    database: 'prisma_postgresql'
+    routes_status: {
+      product_routes: productRoutes ? 'loaded' : 'failed',
+      health_routes: healthRoutes ? 'loaded' : 'failed'
+    }
   });
 });
 
@@ -115,14 +159,13 @@ app.use((req, res) => {
 
 // DÉMARRAGE SERVEUR
 app.listen(PORT, HOST, () => {
-  console.log(`🌱 Serveur Ecolojia OCR INTELLIGENT démarré sur http://${HOST}:${PORT}`);
+  console.log(`🌱 Serveur Ecolojia (mode débogage) démarré sur http://${HOST}:${PORT}`);
   console.log(`🌐 Accessible via: https://ecolojia-backend-working.onrender.com`);
-  console.log(`🧠 OCR Google Vision: ACTIF`);
-  console.log(`📸 Analyse multi-photos: ACTIF`);
-  console.log(`🎯 Extraction intelligente: ACTIF`);
+  console.log(`🔍 Routes chargées:`);
+  console.log(`   Product routes: ${productRoutes ? '✅' : '❌'}`);
+  console.log(`   Health routes: ${healthRoutes ? '✅' : '❌'}`);
   console.log(`📋 Routes disponibles:`);
   console.log(`   GET /health`);
   console.log(`   GET /api/health`);
-  console.log(`   GET /api/products`);
-  console.log(`   POST /api/products/analyze-photos (OCR INTELLIGENT)`);
+  console.log(`   POST /api/products/analyze-photos`);
 });
