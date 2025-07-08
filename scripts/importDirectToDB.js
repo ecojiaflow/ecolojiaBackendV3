@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 /**
  * 🚀 IMPORT OPTIMISÉ - 50+ PRODUITS GARANTIS
- * Version mise à jour avec requêtes multiples
+ * Version avec timeout augmenté (30s) + fonctions intégrées
  */
 
 const CONFIG = {
@@ -24,53 +24,22 @@ async function importDirectToDatabase() {
   let skipped = 0;
 
   try {
-    // 🔍 STRATÉGIE MULTI-REQUÊTES pour maximiser les résultats
     const searchQueries = [
-      // Requête 1: Produits bio généraux
-      {
-        search_terms: 'bio',
-        tagtype_0: 'countries',
-        tag_0: 'France',
-        page_size: 50
-      },
-      // Requête 2: Produits biologiques
-      {
-        search_terms: 'biologique',
-        tagtype_0: 'countries', 
-        tag_0: 'France',
-        page_size: 30
-      },
-      // Requête 3: Produits avec label AB
-      {
-        tagtype_0: 'labels',
-        tag_0: 'AB Agriculture Biologique',
-        page_size: 30
-      },
-      // Requête 4: Produits écologiques
-      {
-        search_terms: 'écologique naturel',
-        tagtype_0: 'countries',
-        tag_0: 'France', 
-        page_size: 25
-      },
-      // Requête 5: Catégories spécifiques
-      {
-        tagtype_0: 'categories',
-        tag_0: 'Produits biologiques',
-        page_size: 40
-      }
+      { search_terms: 'bio', tagtype_0: 'countries', tag_0: 'France', page_size: 50 },
+      { search_terms: 'biologique', tagtype_0: 'countries', tag_0: 'France', page_size: 30 },
+      { tagtype_0: 'labels', tag_0: 'AB Agriculture Biologique', page_size: 30 },
+      { search_terms: 'écologique naturel', tagtype_0: 'countries', tag_0: 'France', page_size: 25 },
+      { tagtype_0: 'categories', tag_0: 'Produits biologiques', page_size: 40 }
     ];
 
     console.log(`🔍 Lancement de ${searchQueries.length} requêtes parallèles...\n`);
 
-    // Exécuter toutes les requêtes en parallèle
-    const promises = searchQueries.map((params, index) => 
+    const promises = searchQueries.map((params, index) =>
       fetchProductsFromOpenFoodFacts(params, index + 1)
     );
 
     const results = await Promise.allSettled(promises);
-    
-    // Collecter tous les produits
+
     results.forEach((result, index) => {
       if (result.status === 'fulfilled' && result.value) {
         console.log(`✅ Requête ${index + 1}: ${result.value.length} produits`);
@@ -80,24 +49,20 @@ async function importDirectToDatabase() {
       }
     });
 
-    // Supprimer les doublons par code-barres
     const uniqueProducts = removeDuplicates(allProducts);
     console.log(`\n📦 Total collecté: ${allProducts.length} produits`);
     console.log(`🔄 Après déduplication: ${uniqueProducts.length} produits uniques`);
 
-    // Limiter au nombre cible
     const finalProducts = uniqueProducts.slice(0, CONFIG.TARGET_PRODUCTS);
     console.log(`🎯 À importer: ${finalProducts.length} produits\n`);
 
-    // Import de chaque produit
     for (let i = 0; i < finalProducts.length; i++) {
       const product = finalProducts[i];
       const progress = `[${i + 1}/${finalProducts.length}]`;
-      
+
       try {
         console.log(`${progress} 📦 ${product.product_name?.substring(0, 35) || 'Produit sans nom'}...`);
 
-        // Vérifier si déjà en base
         const exists = await prisma.product.findFirst({
           where: {
             OR: [
@@ -113,7 +78,6 @@ async function importDirectToDatabase() {
           continue;
         }
 
-        // Transformer et créer
         const productData = transformProductData(product);
         const ecoScore = calculateEcoScore(product);
 
@@ -142,7 +106,6 @@ async function importDirectToDatabase() {
         console.log(`${progress} ✅ ${newProduct.title} (${Math.round(ecoScore.score * 100)}%)`);
         imported++;
 
-        // Délai entre imports
         await new Promise(resolve => setTimeout(resolve, CONFIG.DELAY_MS));
 
       } catch (error) {
@@ -156,16 +119,15 @@ async function importDirectToDatabase() {
     await prisma.$disconnect();
   }
 
-  // Statistiques
   const total = imported + skipped;
   console.log('\n' + '='.repeat(60));
   console.log('📊 RÉSULTATS IMPORT OPTIMISÉ:');
   console.log(`✅ Nouveaux produits: ${imported}`);
   console.log(`⏭️  Déjà en base: ${skipped}`);
   console.log(`📦 Total traité: ${total}`);
-  console.log(`📈 Taux de nouveauté: ${Math.round((imported / total) * 100)}%`);
+  console.log(`📈 Taux de nouveauté: ${total > 0 ? Math.round((imported / total) * 100) : 0}%`);
   console.log('='.repeat(60));
-  
+
   if (imported > 0) {
     console.log('\n🎉 BASE ENRICHIE AVEC SUCCÈS !');
     console.log('💡 Testez votre scanner avec les nouveaux codes-barres !');
@@ -187,22 +149,16 @@ async function fetchProductsFromOpenFoodFacts(params, queryNumber) {
       headers: {
         'User-Agent': 'Ecolojia-Import/1.0 (https://ecolojia.app)'
       },
-      timeout: 15000
+      timeout: 30000
     });
 
     const products = response.data.products || [];
-    
-    // Filtrer les produits valides
-    const validProducts = products.filter(product => {
-      return product.code && 
-             product.code.length >= 8 &&
-             product.product_name && 
-             product.product_name.length > 3 &&
-             !product.product_name.toLowerCase().includes('test') &&
-             !product.product_name.toLowerCase().includes('sample');
-    });
-
-    return validProducts;
+    return products.filter(p =>
+      p.code && p.code.length >= 8 &&
+      p.product_name && p.product_name.length > 3 &&
+      !p.product_name.toLowerCase().includes('test') &&
+      !p.product_name.toLowerCase().includes('sample')
+    );
 
   } catch (error) {
     console.error(`❌ Erreur requête ${queryNumber}:`, error.message);
@@ -213,9 +169,7 @@ async function fetchProductsFromOpenFoodFacts(params, queryNumber) {
 function removeDuplicates(products) {
   const seen = new Set();
   return products.filter(product => {
-    if (seen.has(product.code)) {
-      return false;
-    }
+    if (seen.has(product.code)) return false;
     seen.add(product.code);
     return true;
   });
@@ -235,10 +189,9 @@ function transformProductData(product) {
 }
 
 function calculateEcoScore(product) {
-  let score = 0.6; // Base plus élevée
+  let score = 0.6;
   let confidence = 0.75;
 
-  // Analyse des labels
   if (product.labels) {
     const labels = product.labels.toLowerCase();
     if (labels.includes('bio') || labels.includes('biologique')) score += 0.15;
@@ -247,18 +200,15 @@ function calculateEcoScore(product) {
     if (labels.includes('sans additif')) score += 0.05;
   }
 
-  // Origine française
   if (product.origins?.toLowerCase().includes('france')) {
     score += 0.1;
   }
 
-  // Marque connue pour le bio
   if (product.brands) {
     const brands = product.brands.toLowerCase();
     if (brands.includes('carrefour bio') || brands.includes('monoprix bio')) score += 0.05;
   }
 
-  // Normaliser
   score = Math.max(0.4, Math.min(1.0, score));
   confidence = Math.max(0.7, Math.min(1.0, confidence));
 
@@ -282,28 +232,28 @@ function cleanString(str, maxLength = 200) {
 
 function generateDescription(product) {
   let desc = [];
-  
+
   if (product.brands) {
     desc.push(`Marque: ${product.brands.split(',')[0]}`);
   }
-  
+
   if (product.categories) {
     const mainCat = product.categories.split(',')[0];
     desc.push(`Catégorie: ${mainCat}`);
   }
-  
+
   if (product.stores) {
     desc.push(`Disponible en magasin`);
   }
-  
+
   desc.push('Produit référencé OpenFoodFacts avec informations nutritionnelles');
-  
+
   return desc.join('. ') + '.';
 }
 
 function mapCategory(categories) {
   if (!categories) return 'alimentaire';
-  
+
   const cat = categories.toLowerCase();
   if (cat.includes('boisson')) return 'boissons';
   if (cat.includes('pain') || cat.includes('boulangerie')) return 'boulangerie';
@@ -311,13 +261,13 @@ function mapCategory(categories) {
   if (cat.includes('fruit') || cat.includes('légume')) return 'fruits-légumes';
   if (cat.includes('lait') || cat.includes('yaourt')) return 'produits-laitiers';
   if (cat.includes('céréale') || cat.includes('petit-déjeuner')) return 'petit-déjeuner';
-  
+
   return 'alimentaire';
 }
 
 function extractTags(product) {
   const tags = ['bio', 'openfoodfacts'];
-  
+
   if (product.labels) {
     const labels = product.labels.toLowerCase();
     if (labels.includes('ab')) tags.push('ab-certifié');
@@ -325,10 +275,10 @@ function extractTags(product) {
     if (labels.includes('sans gluten')) tags.push('sans-gluten');
     if (labels.includes('vegan')) tags.push('vegan');
   }
-  
+
   if (product.origins?.includes('France')) tags.push('france');
   if (product.stores) tags.push('grande-distribution');
-  
+
   return [...new Set(tags)];
 }
 
@@ -338,17 +288,16 @@ function generateSlug(title, code) {
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/\s+/g, '-')
     .substring(0, 40);
-    
+
   return `${clean}-${code.slice(-6)}`;
 }
 
-// Lancement
+// Lancement automatique
 if (require.main === module) {
   console.log('🚀 Démarrage import optimisé...\n');
   importDirectToDatabase()
     .then(() => {
       console.log('\n🎉 Import terminé avec succès!');
-      console.log('💡 Testez maintenant votre scanner avec de vrais codes-barres!');
       process.exit(0);
     })
     .catch((error) => {

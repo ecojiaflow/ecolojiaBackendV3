@@ -81,33 +81,26 @@ router.post("/analyze-photos", async (req, res) => {
   try {
     const { barcode, photos, source = 'user_photo_analysis' } = req.body;
 
-    console.log(`📸 Analyse photos AMÉLIORÉE pour code-barres: ${barcode}`);
+    console.log(`📸 Analyse photos pour code-barres: ${barcode}`);
     console.log(`📷 Photos reçues: ${Object.keys(photos || {}).join(', ')}`);
 
-    if (!barcode || !photos || !photos.front) {
-      return res.status(400).json({ success: false, error: "Code-barres et photo 'front' requis minimum" });
+    if (!barcode || !photos || !photos.front || !photos.ingredients) {
+      return res.status(400).json({ success: false, error: "Code-barres et photos 'front' + 'ingredients' requis" });
     }
 
-    const { analyzeMultipleImages } = require("../services/ocr/visionOCR");
-    const ocrResult = await analyzeMultipleImages(photos);
+    const base64Clean = photos.front.replace(/^data:image\/\w+;base64,/, '');
+    const ocrResult = await analyzeImageOCR(base64Clean);
 
     if (!ocrResult.success) {
       return res.status(500).json({ success: false, error: "Erreur OCR", detail: ocrResult.error });
     }
 
-    console.log('🧠 OCR Results:', {
-      name: ocrResult.name,
-      brand: ocrResult.brand,
-      ingredients_count: ocrResult.ingredients?.length || 0,
-      confidence: Math.round(ocrResult.confidence * 100) + '%'
-    });
-
     const detailedScore = await EcoScoreService.calculateDetailedEcoScore({
       title: ocrResult.name,
-      description: `Produit analysé automatiquement. Ingrédients: ${ocrResult.ingredients.slice(0, 3).join(', ')}.`,
+      description: `Produit analysé automatiquement`,
       brand: ocrResult.brand,
       category: ocrResult.category,
-      tags: [...ocrResult.certifications, ...ocrResult.ingredients.slice(0, 3)]
+      tags: []
     });
 
     const slug = ocrResult.name
@@ -121,25 +114,23 @@ router.post("/analyze-photos", async (req, res) => {
       data: {
         title: ocrResult.name,
         slug,
-        description: `Produit analysé via Google OCR. Ingrédients détectés: ${ocrResult.ingredients.slice(0, 5).join(', ')}.`,
+        description: `Produit analysé via Google OCR`,
         brand: ocrResult.brand,
         category: ocrResult.category,
         barcode,
-        tags: [...ocrResult.certifications, ...ocrResult.ingredients.slice(0, 5), `confiance-${Math.round(ocrResult.confidence * 100)}pct`],
+        tags: [],
         images: photos.front ? [photos.front] : [],
         eco_score: detailedScore.eco_score,
         ai_confidence: detailedScore.ai_confidence,
         confidence_pct: detailedScore.confidence_pct,
         confidence_color: detailedScore.confidence_color,
         verified_status: 'ai_analyzed',
-        resume_fr: `Produit analysé par IA avec ${Math.round(ocrResult.confidence * 100)}% de confiance. Score écologique: ${Math.round(detailedScore.eco_score * 100)}%. ${ocrResult.certifications.length > 0 ? `Certifications: ${ocrResult.certifications.join(', ')}.` : ''} ${ocrResult.ingredients.length} ingrédients identifiés.`,
+        resume_fr: `Produit analysé automatiquement par IA. Score écologique: ${Math.round(detailedScore.eco_score * 100)}%.`,
         enriched_at: new Date(),
         zones_dispo: ['FR'],
         prices: { default: 0 }
       }
     });
-
-    console.log('✅ Produit créé avec analyse OCR améliorée:', newProduct.title);
 
     res.json({
       success: true,
@@ -147,17 +138,15 @@ router.post("/analyze-photos", async (req, res) => {
       productSlug: newProduct.slug,
       productName: newProduct.title,
       analysis: {
-        ocr_confidence: `${Math.round(ocrResult.confidence * 100)}%`,
-        ingredients_detected: ocrResult.ingredients.length,
-        certifications_found: ocrResult.certifications,
+        ocr_text: ocrResult.rawText,
         eco_score: detailedScore,
-        raw_texts: ocrResult.rawTexts
+        confidence: `${detailedScore.confidence_pct}%`
       },
       redirect_url: `/product/${newProduct.slug}`
     });
 
   } catch (error) {
-    console.error('❌ Erreur analyse OCR améliorée:', error);
+    console.error('❌ Erreur analyse OCR:', error);
     res.status(500).json({
       success: false,
       error: "Erreur lors de l'analyse des photos",
