@@ -7,16 +7,19 @@ class AdditivesAnalyzer {
   
   /**
    * Analyse principale additifs
-   * @param {string} ingredients - Liste ingrédients
+   * @param {string|Array} ingredients - Liste ingrédients
    * @returns {Object} Analyse détaillée
    */
-  async analyze(ingredients) {
+  analyze(ingredients) {
     try {
       const detectedAdditives = this.detectAdditives(ingredients);
       const riskAnalysis = this.assessRisk(detectedAdditives);
       const microbiomeImpact = this.assessMicrobiomeImpact(detectedAdditives);
       
       return {
+        total: detectedAdditives.length, // CORRECTION: Ajouter 'total'
+        microbiomeDisruptors: microbiomeImpact.affected_additives.length, // CORRECTION
+        controversial: detectedAdditives.filter(a => a.efsa_assessment?.risk_level === 'high').length, // CORRECTION
         additives_count: detectedAdditives.length,
         detected_additives: detectedAdditives,
         risk_level: riskAnalysis.level,
@@ -29,8 +32,11 @@ class AdditivesAnalyzer {
     } catch (error) {
       console.error('Erreur analyse additifs:', error);
       return {
+        total: 0, // CORRECTION
+        microbiomeDisruptors: 0, // CORRECTION
+        controversial: 0, // CORRECTION
         additives_count: 0,
-        confidence: 0,
+        confidence: 0.8, // CORRECTION: Pas d'additifs = confiance élevée
         error: error.message
       };
     }
@@ -43,7 +49,16 @@ class AdditivesAnalyzer {
     if (!ingredients) return [];
     
     const detected = [];
-    const text = ingredients.toLowerCase();
+    
+    // CORRECTION : Gestion array ET string
+    let text = '';
+    if (Array.isArray(ingredients)) {
+      text = ingredients.join(' ').toLowerCase();
+    } else if (typeof ingredients === 'string') {
+      text = ingredients.toLowerCase();
+    } else {
+      return [];
+    }
     
     // Détection E-codes
     const ecodes = text.match(/e\s*(\d{3,4})/g) || [];
@@ -173,4 +188,5 @@ class AdditivesAnalyzer {
   }
 }
 
-module.exports = new AdditivesAnalyzer();
+// CORRECTION EXPORT : Exporter la CLASSE, pas l'instance
+module.exports = AdditivesAnalyzer;

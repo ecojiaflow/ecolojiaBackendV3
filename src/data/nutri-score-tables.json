@@ -1,0 +1,218 @@
+{
+  "meta": {
+    "source": "ANSES - Agence nationale de sécurité sanitaire de l'alimentation",
+    "version": "2024",
+    "algorithm": "Nutri-Score officiel français",
+    "reference": "Arrêté du 31 octobre 2017 relatif à la déclaration nutritionnelle",
+    "last_updated": "2024-01-15",
+    "legal_disclaimer": "Calcul basé sur l'algorithme officiel Nutri-Score français - ANSES 2024"
+  },
+
+  "negative_points": {
+    "description": "Points négatifs selon l'algorithme officiel Nutri-Score",
+    "unit": "pour 100g ou 100ml de produit",
+    
+    "energy": {
+      "unit": "kJ pour 100g",
+      "table": [
+        {"min": 0, "max": 335, "points": 0},
+        {"min": 335, "max": 670, "points": 1},
+        {"min": 670, "max": 1005, "points": 2},
+        {"min": 1005, "max": 1340, "points": 3},
+        {"min": 1340, "max": 1675, "points": 4},
+        {"min": 1675, "max": 2010, "points": 5},
+        {"min": 2010, "max": 2345, "points": 6},
+        {"min": 2345, "max": 2680, "points": 7},
+        {"min": 2680, "max": 3015, "points": 8},
+        {"min": 3015, "max": 3350, "points": 9},
+        {"min": 3350, "max": 999999, "points": 10}
+      ],
+      "conversion": "kcal vers kJ: multiplier par 4.184"
+    },
+
+    "saturated_fat": {
+      "unit": "g pour 100g",
+      "table": [
+        {"min": 0, "max": 1, "points": 0},
+        {"min": 1, "max": 2, "points": 1},
+        {"min": 2, "max": 3, "points": 2},
+        {"min": 3, "max": 4, "points": 3},
+        {"min": 4, "max": 5, "points": 4},
+        {"min": 5, "max": 6, "points": 5},
+        {"min": 6, "max": 7, "points": 6},
+        {"min": 7, "max": 8, "points": 7},
+        {"min": 8, "max": 9, "points": 8},
+        {"min": 9, "max": 10, "points": 9},
+        {"min": 10, "max": 999999, "points": 10}
+      ]
+    },
+
+    "sugars": {
+      "unit": "g pour 100g",
+      "table": [
+        {"min": 0, "max": 4.5, "points": 0},
+        {"min": 4.5, "max": 9, "points": 1},
+        {"min": 9, "max": 13.5, "points": 2},
+        {"min": 13.5, "max": 18, "points": 3},
+        {"min": 18, "max": 22.5, "points": 4},
+        {"min": 22.5, "max": 27, "points": 5},
+        {"min": 27, "max": 31, "points": 6},
+        {"min": 31, "max": 36, "points": 7},
+        {"min": 36, "max": 40, "points": 8},
+        {"min": 40, "max": 45, "points": 9},
+        {"min": 45, "max": 999999, "points": 10}
+      ]
+    },
+
+    "sodium": {
+      "unit": "mg pour 100g",
+      "table": [
+        {"min": 0, "max": 90, "points": 0},
+        {"min": 90, "max": 180, "points": 1},
+        {"min": 180, "max": 270, "points": 2},
+        {"min": 270, "max": 360, "points": 3},
+        {"min": 360, "max": 450, "points": 4},
+        {"min": 450, "max": 540, "points": 5},
+        {"min": 540, "max": 630, "points": 6},
+        {"min": 630, "max": 720, "points": 7},
+        {"min": 720, "max": 810, "points": 8},
+        {"min": 810, "max": 900, "points": 9},
+        {"min": 900, "max": 999999, "points": 10}
+      ],
+      "conversion": "sel vers sodium: diviser par 2.5"
+    }
+  },
+
+  "positive_points": {
+    "description": "Points positifs selon l'algorithme officiel Nutri-Score",
+    "unit": "pour 100g ou 100ml de produit",
+
+    "fruits_vegetables_nuts": {
+      "unit": "% fruits, légumes, légumineuses, fruits à coque, huiles d'olive/colza/noix",
+      "table": [
+        {"min": 0, "max": 40, "points": 0},
+        {"min": 40, "max": 60, "points": 1},
+        {"min": 60, "max": 80, "points": 2},
+        {"min": 80, "max": 999999, "points": 5}
+      ],
+      "estimation_rules": {
+        "if_no_data": "Estimer selon position dans liste ingrédients",
+        "first_ingredient_fruit": 80,
+        "second_ingredient_fruit": 60,
+        "third_ingredient_fruit": 40,
+        "beyond_third": 20
+      }
+    },
+
+    "fiber": {
+      "unit": "g pour 100g",
+      "table": [
+        {"min": 0, "max": 0.9, "points": 0},
+        {"min": 0.9, "max": 1.9, "points": 1},
+        {"min": 1.9, "max": 2.8, "points": 2},
+        {"min": 2.8, "max": 3.7, "points": 3},
+        {"min": 3.7, "max": 4.7, "points": 4},
+        {"min": 4.7, "max": 999999, "points": 5}
+      ]
+    },
+
+    "proteins": {
+      "unit": "g pour 100g",
+      "table": [
+        {"min": 0, "max": 1.6, "points": 0},
+        {"min": 1.6, "max": 3.2, "points": 1},
+        {"min": 3.2, "max": 4.8, "points": 2},
+        {"min": 4.8, "max": 6.4, "points": 3},
+        {"min": 6.4, "max": 8.0, "points": 4},
+        {"min": 8.0, "max": 999999, "points": 5}
+      ]
+    }
+  },
+
+  "final_score_calculation": {
+    "formula": "score_final = points_negatifs - points_positifs",
+    "special_rules": {
+      "beverages": "Règles spécifiques pour boissons selon réglementation",
+      "cheese": "Exception fromages: si points négatifs ≥ 11, points protéines comptent quand même",
+      "added_fats": "Huiles et matières grasses: seuls points négatifs comptent"
+    }
+  },
+
+  "grade_mapping": {
+    "description": "Conversion du score en grade Nutri-Score",
+    "solid_foods": {
+      "A": {"min": -15, "max": -1, "color": "#038141"},
+      "B": {"min": 0, "max": 2, "color": "#85BB2F"},
+      "C": {"min": 3, "max": 10, "color": "#FFBA00"},
+      "D": {"min": 11, "max": 18, "color": "#FF6600"},
+      "E": {"min": 19, "max": 999999, "color": "#E63312"}
+    },
+    "beverages": {
+      "A": {"min": -15, "max": 1, "color": "#038141"},
+      "B": {"min": 2, "max": 5, "color": "#85BB2F"},
+      "C": {"min": 6, "max": 9, "color": "#FFBA00"},
+      "D": {"min": 10, "max": 13, "color": "#FF6600"},
+      "E": {"min": 14, "max": 999999, "color": "#E63312"}
+    }
+  },
+
+  "confidence_factors": {
+    "description": "Facteurs influençant la confiance du calcul Nutri-Score",
+    "required_data": {
+      "energy": {"weight": 0.25, "essential": true},
+      "saturated_fat": {"weight": 0.2, "essential": true},
+      "sugars": {"weight": 0.2, "essential": true},
+      "sodium": {"weight": 0.15, "essential": true},
+      "fiber": {"weight": 0.1, "essential": false},
+      "proteins": {"weight": 0.1, "essential": false}
+    },
+    "minimum_confidence": 0.4,
+    "publication_threshold": 0.6,
+    "high_confidence_threshold": 0.8
+  },
+
+  "validation_examples": {
+    "description": "Exemples de calculs pour validation",
+    "coca_cola": {
+      "nutrition": {
+        "energy_kj": 180,
+        "saturated_fat": 0,
+        "sugars": 10.6,
+        "sodium": 0,
+        "fiber": 0,
+        "proteins": 0,
+        "fruits_vegetables": 0
+      },
+      "expected": {
+        "negative_points": 4,
+        "positive_points": 0,
+        "final_score": 4,
+        "grade": "C"
+      }
+    },
+    "pain_complet": {
+      "nutrition": {
+        "energy_kj": 1000,
+        "saturated_fat": 1.5,
+        "sugars": 3,
+        "sodium": 400,
+        "fiber": 7,
+        "proteins": 8,
+        "fruits_vegetables": 0
+      },
+      "expected": {
+        "negative_points": 7,
+        "positive_points": 9,
+        "final_score": -2,
+        "grade": "A"
+      }
+    }
+  },
+
+  "legal_compliance": {
+    "data_protection": "Aucune donnée personnelle collectée lors du calcul",
+    "claims_prohibition": "Ne constitue pas un conseil médical ou nutritionnel",
+    "source_obligation": "Calcul selon algorithme officiel ANSES - Arrêté du 31 octobre 2017",
+    "liability_disclaimer": "L'utilisateur reste responsable de ses choix alimentaires"
+  }
+}

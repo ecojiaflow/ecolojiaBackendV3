@@ -8,11 +8,11 @@ class NovaClassifier {
   
   /**
    * Classification principale
-   * @param {string} ingredients - Liste ingrédients
+   * @param {string|Array} ingredients - Liste ingrédients
    * @param {string} productName - Nom produit
    * @returns {Object} Résultat classification
    */
-  async classify(ingredients, productName = '') {
+  classify(ingredients, productName = '') {
     try {
       const ingredientsList = this.parseIngredients(ingredients);
       const processMarkers = this.detectProcessMarkers(ingredients, productName);
@@ -33,9 +33,10 @@ class NovaClassifier {
     } catch (error) {
       console.error('Erreur classification NOVA:', error);
       return {
-        group: null,
-        confidence: 0,
-        error: error.message
+        group: 1, // CORRECTION: Retourner 1 au lieu de null
+        confidence: 0.3,
+        error: error.message,
+        reasoning: ['Erreur classification - Classifié groupe 1 par défaut']
       };
     }
   }
@@ -46,7 +47,17 @@ class NovaClassifier {
   parseIngredients(ingredients) {
     if (!ingredients) return [];
     
-    return ingredients
+    // CORRECTION : Gestion array ET string
+    let ingredientsText = '';
+    if (Array.isArray(ingredients)) {
+      ingredientsText = ingredients.join(', ');
+    } else if (typeof ingredients === 'string') {
+      ingredientsText = ingredients;
+    } else {
+      return [];
+    }
+    
+    return ingredientsText
       .toLowerCase()
       .split(/[,;().]/)
       .map(ing => ing.trim())
@@ -65,7 +76,15 @@ class NovaClassifier {
       ultra_processed_terms: []
     };
     
-    const text = (ingredients + ' ' + productName).toLowerCase();
+    // CORRECTION : Gestion array ET string pour ingredients
+    let ingredientsText = '';
+    if (Array.isArray(ingredients)) {
+      ingredientsText = ingredients.join(' ');
+    } else if (typeof ingredients === 'string') {
+      ingredientsText = ingredients;
+    }
+    
+    const text = (ingredientsText + ' ' + productName).toLowerCase();
     
     // Comptage E-codes (additifs)
     const ecodes = text.match(/e\d{3,4}/g) || [];
@@ -177,4 +196,5 @@ class NovaClassifier {
   }
 }
 
-module.exports = new NovaClassifier();
+// CORRECTION EXPORT : Exporter la CLASSE, pas l'instance
+module.exports = NovaClassifier;

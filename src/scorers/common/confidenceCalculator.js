@@ -57,4 +57,5 @@ class ConfidenceCalculator {
   }
 }
 
-module.exports = new ConfidenceCalculator();
+// CORRECTION EXPORT : Exporter la CLASSE, pas l'instance
+module.exports = ConfidenceCalculator;

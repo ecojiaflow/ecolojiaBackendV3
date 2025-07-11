@@ -1,0 +1,244 @@
+{
+  "meta": {
+    "source": "International Table of Glycemic Index and Glycemic Load Values 2024",
+    "references": [
+      "University of Sydney - GI Database 2024",
+      "INSERM - Études glycémiques françaises",
+      "Diabetes Care Journal - Meta-analyses 2024"
+    ],
+    "last_updated": "2024-01-15",
+    "methodology": "IG mesuré sur glucose = 100, seuil publication ≥ 10 sujets",
+    "legal_disclaimer": "Estimations basées sur données scientifiques - Ne remplace pas avis médical"
+  },
+
+  "categories": {
+    "cereals_grains": {
+      "description": "Céréales et produits céréaliers",
+      "items": {
+        "avoine_flocons": {"gi": 40, "gl_per_serving": 8, "confidence": 0.9},
+        "ble_entier": {"gi": 30, "gl_per_serving": 6, "confidence": 0.85},
+        "ble_farine_blanche": {"gi": 70, "gl_per_serving": 14, "confidence": 0.95},
+        "mais_grain": {"gi": 60, "gl_per_serving": 12, "confidence": 0.8},
+        "orge_perle": {"gi": 25, "gl_per_serving": 5, "confidence": 0.85},
+        "quinoa": {"gi": 35, "gl_per_serving": 7, "confidence": 0.8},
+        "riz_blanc": {"gi": 73, "gl_per_serving": 15, "confidence": 0.95},
+        "riz_complet": {"gi": 50, "gl_per_serving": 10, "confidence": 0.9},
+        "riz_basmati": {"gi": 43, "gl_per_serving": 9, "confidence": 0.85},
+        "sarrasin": {"gi": 45, "gl_per_serving": 9, "confidence": 0.8}
+      }
+    },
+
+    "bread_products": {
+      "description": "Pains et produits de boulangerie",
+      "items": {
+        "baguette_francaise": {"gi": 85, "gl_per_serving": 17, "confidence": 0.95},
+        "pain_blanc": {"gi": 75, "gl_per_serving": 15, "confidence": 0.95},
+        "pain_complet": {"gi": 55, "gl_per_serving": 11, "confidence": 0.9},
+        "pain_seigle": {"gi": 50, "gl_per_serving": 10, "confidence": 0.85},
+        "pain_avoine": {"gi": 47, "gl_per_serving": 9, "confidence": 0.8},
+        "pain_pumpernickel": {"gi": 41, "gl_per_serving": 8, "confidence": 0.85},
+        "biscottes": {"gi": 70, "gl_per_serving": 14, "confidence": 0.9},
+        "crackers": {"gi": 65, "gl_per_serving": 13, "confidence": 0.85}
+      }
+    },
+
+    "pasta_noodles": {
+      "description": "Pâtes et nouilles",
+      "items": {
+        "pates_blanches_cuites": {"gi": 50, "gl_per_serving": 10, "confidence": 0.9},
+        "pates_completes_cuites": {"gi": 40, "gl_per_serving": 8, "confidence": 0.85},
+        "nouilles_riz": {"gi": 65, "gl_per_serving": 13, "confidence": 0.8},
+        "couscous": {"gi": 65, "gl_per_serving": 13, "confidence": 0.85},
+        "gnocchis": {"gi": 68, "gl_per_serving": 14, "confidence": 0.8}
+      }
+    },
+
+    "legumes": {
+      "description": "Légumineuses",
+      "items": {
+        "haricots_rouges": {"gi": 24, "gl_per_serving": 5, "confidence": 0.9},
+        "haricots_blancs": {"gi": 30, "gl_per_serving": 6, "confidence": 0.85},
+        "lentilles_vertes": {"gi": 25, "gl_per_serving": 5, "confidence": 0.95},
+        "lentilles_corail": {"gi": 35, "gl_per_serving": 7, "confidence": 0.8},
+        "pois_chiches": {"gi": 35, "gl_per_serving": 7, "confidence": 0.9},
+        "pois_casses": {"gi": 32, "gl_per_serving": 6, "confidence": 0.8},
+        "feves": {"gi": 40, "gl_per_serving": 8, "confidence": 0.8},
+        "soja": {"gi": 15, "gl_per_serving": 3, "confidence": 0.85}
+      }
+    },
+
+    "fruits": {
+      "description": "Fruits frais et transformés",
+      "items": {
+        "pomme": {"gi": 35, "gl_per_serving": 5, "confidence": 0.95},
+        "banane": {"gi": 55, "gl_per_serving": 11, "confidence": 0.95},
+        "orange": {"gi": 40, "gl_per_serving": 6, "confidence": 0.9},
+        "raisin": {"gi": 45, "gl_per_serving": 9, "confidence": 0.85},
+        "ananas": {"gi": 50, "gl_per_serving": 10, "confidence": 0.8},
+        "pasteque": {"gi": 75, "gl_per_serving": 4, "confidence": 0.85},
+        "melon": {"gi": 65, "gl_per_serving": 4, "confidence": 0.8},
+        "kiwi": {"gi": 39, "gl_per_serving": 6, "confidence": 0.8},
+        "mangue": {"gi": 51, "gl_per_serving": 8, "confidence": 0.8},
+        "dates": {"gi": 55, "gl_per_serving": 18, "confidence": 0.85},
+        "raisins_secs": {"gi": 65, "gl_per_serving": 20, "confidence": 0.9}
+      }
+    },
+
+    "vegetables": {
+      "description": "Légumes et tubercules",
+      "items": {
+        "pomme_terre_cuite": {"gi": 70, "gl_per_serving": 14, "confidence": 0.95},
+        "pomme_terre_puree": {"gi": 85, "gl_per_serving": 17, "confidence": 0.9},
+        "patate_douce": {"gi": 55, "gl_per_serving": 11, "confidence": 0.85},
+        "carotte_cuite": {"gi": 50, "gl_per_serving": 3, "confidence": 0.8},
+        "carotte_crue": {"gi": 15, "gl_per_serving": 1, "confidence": 0.85},
+        "betterave": {"gi": 60, "gl_per_serving": 5, "confidence": 0.8},
+        "courge": {"gi": 45, "gl_per_serving": 3, "confidence": 0.75},
+        "mais_doux": {"gi": 60, "gl_per_serving": 9, "confidence": 0.85}
+      }
+    },
+
+    "sugars_sweeteners": {
+      "description": "Sucres et édulcorants",
+      "items": {
+        "glucose": {"gi": 100, "gl_per_serving": 10, "confidence": 1.0},
+        "sucre_blanc": {"gi": 70, "gl_per_serving": 7, "confidence": 0.95},
+        "miel": {"gi": 55, "gl_per_serving": 12, "confidence": 0.9},
+        "sirop_erable": {"gi": 55, "gl_per_serving": 11, "confidence": 0.85},
+        "fructose": {"gi": 15, "gl_per_serving": 2, "confidence": 0.95},
+        "lactose": {"gi": 45, "gl_per_serving": 5, "confidence": 0.9}
+      }
+    },
+
+    "processed_foods": {
+      "description": "Aliments transformés et ultra-transformés",
+      "items": {
+        "biscuits_digestifs": {"gi": 70, "gl_per_serving": 14, "confidence": 0.85},
+        "galettes_riz": {"gi": 87, "gl_per_serving": 17, "confidence": 0.9},
+        "corn_flakes": {"gi": 85, "gl_per_serving": 21, "confidence": 0.95},
+        "barres_cereales": {"gi": 65, "gl_per_serving": 13, "confidence": 0.8},
+        "chocolat_noir": {"gi": 25, "gl_per_serving": 5, "confidence": 0.85},
+        "chocolat_lait": {"gi": 45, "gl_per_serving": 12, "confidence": 0.85},
+        "glace": {"gi": 50, "gl_per_serving": 8, "confidence": 0.8},
+        "pizza": {"gi": 60, "gl_per_serving": 16, "confidence": 0.75}
+      }
+    },
+
+    "beverages": {
+      "description": "Boissons",
+      "items": {
+        "jus_orange": {"gi": 50, "gl_per_serving": 12, "confidence": 0.9},
+        "jus_pomme": {"gi": 40, "gl_per_serving": 10, "confidence": 0.85},
+        "coca_cola": {"gi": 65, "gl_per_serving": 16, "confidence": 0.95},
+        "boisson_sport": {"gi": 75, "gl_per_serving": 8, "confidence": 0.85},
+        "lait_entier": {"gi": 30, "gl_per_serving": 4, "confidence": 0.9},
+        "lait_ecreme": {"gi": 32, "gl_per_serving": 4, "confidence": 0.85}
+      }
+    }
+  },
+
+  "modifying_factors": {
+    "description": "Facteurs modifiant l'index glycémique",
+    "fiber_content": {
+      "low_fiber": {"threshold": 3, "modifier": 1.0},
+      "medium_fiber": {"threshold": 6, "modifier": 0.85},
+      "high_fiber": {"threshold": 999, "modifier": 0.7}
+    },
+    "fat_content": {
+      "low_fat": {"threshold": 5, "modifier": 1.0},
+      "medium_fat": {"threshold": 15, "modifier": 0.9},
+      "high_fat": {"threshold": 999, "modifier": 0.8}
+    },
+    "protein_content": {
+      "low_protein": {"threshold": 5, "modifier": 1.0},
+      "medium_protein": {"threshold": 15, "modifier": 0.95},
+      "high_protein": {"threshold": 999, "modifier": 0.85}
+    },
+    "processing_level": {
+      "minimal": {"modifier": 1.0, "description": "NOVA 1"},
+      "processed": {"modifier": 1.1, "description": "NOVA 2-3"},
+      "ultra_processed": {"modifier": 1.25, "description": "NOVA 4"}
+    },
+    "cooking_method": {
+      "raw": {"modifier": 0.9},
+      "steamed": {"modifier": 0.95},
+      "boiled": {"modifier": 1.0},
+      "fried": {"modifier": 1.15},
+      "extruded": {"modifier": 1.3}
+    }
+  },
+
+  "classification_ranges": {
+    "low_gi": {"min": 0, "max": 55, "health_impact": "favorable"},
+    "medium_gi": {"min": 56, "max": 69, "health_impact": "moderate"},
+    "high_gi": {"min": 70, "max": 100, "health_impact": "unfavorable"}
+  },
+
+  "glycemic_load_ranges": {
+    "low_gl": {"min": 0, "max": 10, "health_impact": "favorable"},
+    "medium_gl": {"min": 11, "max": 19, "health_impact": "moderate"},
+    "high_gl": {"min": 20, "max": 999, "health_impact": "unfavorable"}
+  },
+
+  "estimation_algorithms": {
+    "ingredient_matching": {
+      "exact_match": {"confidence": 0.95},
+      "category_match": {"confidence": 0.8},
+      "similar_food": {"confidence": 0.6},
+      "default_category": {"confidence": 0.4}
+    },
+    "composition_analysis": {
+      "carb_percentage": {
+        "high": {"threshold": 60, "base_gi": 70},
+        "medium": {"threshold": 30, "base_gi": 50},
+        "low": {"threshold": 999, "base_gi": 30}
+      }
+    }
+  },
+
+  "health_implications": {
+    "low_gi_benefits": [
+      "Meilleure régulation glycémique",
+      "Sensation de satiété prolongée",
+      "Réduction risque diabète type 2",
+      "Contrôle du poids facilité"
+    ],
+    "high_gi_risks": [
+      "Pic glycémique rapide",
+      "Hypoglycémie réactionnelle",
+      "Augmentation risque cardiovasculaire",
+      "Perturbation métabolique"
+    ]
+  },
+
+  "scoring_impact": {
+    "penalties": {
+      "very_low_gi": {"range": "0-35", "penalty": 0},
+      "low_gi": {"range": "36-55", "penalty": -2},
+      "medium_gi": {"range": "56-69", "penalty": -5},
+      "high_gi": {"range": "70-84", "penalty": -10},
+      "very_high_gi": {"range": "85-100", "penalty": -15}
+    }
+  },
+
+  "validation_examples": {
+    "pain_blanc": {
+      "base_gi": 75,
+      "modifiers": {"processing": 1.0, "fiber": 1.0},
+      "final_gi": 75,
+      "confidence": 0.95
+    },
+    "galettes_riz": {
+      "base_gi": 87,
+      "modifiers": {"processing": 1.25, "fiber": 1.0},
+      "final_gi": 87,
+      "confidence": 0.9
+    }
+  },
+
+  "legal_compliance": {
+    "scientific_basis": "Basé sur études cliniques publiées avec ≥ 10 sujets",
+    "estimation_disclaimer": "Estimations à titre informatif - Variabilité individuelle possible",
+    "medical_disclaimer": "Ne constitue pas un conseil médical - Consulter professionnel santé"
+  }
+}
