@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const dotenv = require('dotenv');
 const visionOCR = require('./services/ocr/visionOCR');
+const analyzeRoutes = require('./routes/analyze.routes');
 
 dotenv.config();
 
@@ -152,21 +153,31 @@ healthRoutes.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    mode: 'ocr-intelligent'
+    mode: 'ocr-intelligent',
+    nova_scoring: 'active',
+    efsa_additives: 'active'
   });
 });
 
 app.use('/api/products', productRoutes);
 app.use('/api', healthRoutes);
+app.use('/api/analyze', analyzeRoutes);
 
 app.get('/', (req, res) => {
   res.json({
-    message: 'Ecolojia API - OCR intelligent actif',
-    version: '2.1.0',
+    message: 'Ecolojia API - OCR intelligent + NOVA/EFSA actif',
+    version: '2.2.0',
     environment: process.env.NODE_ENV || 'production',
     timestamp: new Date().toISOString(),
+    features: {
+      'OCR Google Vision': 'active',
+      'Classification NOVA': 'active',
+      'Additifs EFSA': 'active'
+    },
     endpoints: {
       'POST /api/products/analyze-photos': 'OCR IA Google Vision',
+      'POST /api/analyze/food': 'Classification NOVA + Additifs EFSA',
+      'GET /api/analyze/health': 'Status scoring scientifique',
       'GET /api/products': 'fallback mock',
       'GET /api/products/:slug': 'fallback mock',
     }
@@ -185,10 +196,20 @@ app.use((error, req, res, next) => {
 app.use((req, res) => {
   res.status(404).json({
     error: 'Route non trouvée',
-    requested: req.originalUrl
+    requested: req.originalUrl,
+    available_endpoints: [
+      'POST /api/products/analyze-photos',
+      'POST /api/analyze/food',
+      'GET /api/analyze/health',
+      'GET /api/products',
+      'GET /health'
+    ]
   });
 });
 
 app.listen(PORT, HOST, () => {
-  console.log(`🌱 Serveur Ecolojia (OCR IA ACTIVÉ) sur http://${HOST}:${PORT}`);
+  console.log(`🌱 Serveur Ecolojia (OCR IA + NOVA/EFSA) sur http://${HOST}:${PORT}`);
+  console.log(`🔬 Classification NOVA active`);
+  console.log(`🧪 Base additifs EFSA active`);
+  console.log(`📷 OCR Google Vision active`);
 });

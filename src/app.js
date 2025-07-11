@@ -16,6 +16,9 @@ const {
   getProductBySlug 
 } = require('./db/pool');
 
+// 🔬 IMPORT ROUTE ANALYZE (NOVA + EFSA)
+const analyzeRoutes = require('./routes/analyze.routes');
+
 // 📦 PRODUITS DE SECOURS (FALLBACK UNIQUEMENT)
 const fallbackProducts = [
   {
@@ -69,6 +72,9 @@ app.use(helmet({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// 🔬 ROUTES ANALYSE SCIENTIFIQUE
+app.use('/api/analyze', analyzeRoutes);
 
 // 🧪 ROUTE TEST
 app.get('/api/test-barcode', (req, res) => {
@@ -370,15 +376,17 @@ app.get('/', async (req, res) => {
     
     res.json({
       message: 'Ecolojia API - ÉTAPE 1 RÉUSSIE',
-      version: '1.1.0',
+      version: '1.2.0',
       status: 'operational',
       environment: process.env.NODE_ENV || 'production',
       timestamp: new Date().toISOString(),
-      etape_status: 'ÉTAPE 1 TERMINÉE - PostgreSQL activé',
+      etape_status: 'SPRINT 1 TERMINÉ - Classification NOVA + Additifs EFSA',
       products_count: productCount,
       database: databaseStatus,
       postgresql_enabled: isPostgreSQLConnected(),
-      prochaine_etape: 'ÉTAPE 2: Import OpenFoodFacts 200+ produits',
+      nova_scoring: 'Actif ✅',
+      efsa_additives: 'Actif ✅',
+      prochaine_etape: 'SPRINT 2: Nutri-Score + Index Glycémique',
       endpoints: {
         products: [
           'GET /api/products ✅ (PostgreSQL prioritaire)',
@@ -386,6 +394,10 @@ app.get('/', async (req, res) => {
           'GET /api/products/:slug ✅ (PostgreSQL prioritaire)',
           'GET /api/products/barcode/:code ✅ (PostgreSQL prioritaire)',
           'POST /api/products/analyze-photos ✅ (Prêt pour ÉTAPE 3)'
+        ],
+        analyze: [
+          'POST /api/analyze/food ✅ (NOVA + EFSA)',
+          'GET /api/analyze/health ✅'
         ],
         test: ['GET /api/test-barcode ✅'],
         health: ['GET /health ✅', 'GET /api/health ✅']
@@ -408,7 +420,9 @@ app.get('/health', (req, res) => {
     status: 'ok', 
     timestamp: new Date().toISOString(),
     database: dbStatus,
-    etape: 'ÉTAPE 1 TERMINÉE'
+    etape: 'SPRINT 1 TERMINÉ',
+    nova_classification: 'active',
+    efsa_additives: 'active'
   });
 });
 
@@ -418,7 +432,9 @@ app.get('/api/health', (req, res) => {
     status: 'ok', 
     timestamp: new Date().toISOString(),
     database: dbStatus,
-    etape: 'ÉTAPE 1 TERMINÉE'
+    etape: 'SPRINT 1 TERMINÉ',
+    nova_classification: 'active',
+    efsa_additives: 'active'
   });
 });
 
@@ -426,9 +442,10 @@ app.get('/api/health', (req, res) => {
 console.log('🔌 Initialisation PostgreSQL...');
 testConnection().then((success) => {
   if (success) {
-    console.log('🎉 ÉTAPE 1 RÉUSSIE - PostgreSQL activé');
+    console.log('🎉 SPRINT 1 RÉUSSI - Classification NOVA + Additifs EFSA');
     console.log('✅ Base de données connectée');
-    console.log('🚀 Prêt pour ÉTAPE 2: Import OpenFoodFacts');
+    console.log('🔬 Scoring scientifique opérationnel');
+    console.log('🚀 Prêt pour SPRINT 2: Nutri-Score + Index Glycémique');
   } else {
     console.log('⚠️ PostgreSQL indisponible - Mode fallback');
     console.log('🔧 Vérifiez DATABASE_URL et connexion réseau');

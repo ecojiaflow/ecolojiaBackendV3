@@ -1,0 +1,57 @@
+{
+  "classification_version": "INSERM_2024",
+  "source": "https://www.inserm.fr/dossier/alimentation-ultra-transformee/",
+  "industrial_ingredients": [
+    {
+      "name": "sirop de glucose-fructose",
+      "category": "sweetener",
+      "nova_indicator": 4
+    },
+    {
+      "name": "protéines hydrolysées", 
+      "category": "protein_modifier",
+      "nova_indicator": 4
+    },
+    {
+      "name": "isolat de protéines",
+      "category": "protein_isolate", 
+      "nova_indicator": 4
+    },
+    {
+      "name": "huiles hydrogénées",
+      "category": "modified_fat",
+      "nova_indicator": 4
+    },
+    {
+      "name": "maltodextrine",
+      "category": "starch_modifier",
+      "nova_indicator": 3
+    },
+    {
+      "name": "sirop de maïs",
+      "category": "sweetener",
+      "nova_indicator": 3
+    }
+  ],
+  "process_indicators": [
+    "extrudé",
+    "atomisé", 
+    "hydrogéné",
+    "interestérifié",
+    "texturé",
+    "reconstitué",
+    "fractionné"
+  ],
+  "ultra_processed_terms": [
+    "nuggets",
+    "bâtonnets",
+    "galettes soufflées",
+    "barres céréales",
+    "plat cuisiné",
+    "pizza surgelée",
+    "biscuits fourrés",
+    "céréales petit-déjeuner",
+    "boisson énergisante",
+    "substitut de repas"
+  ]
+}
