@@ -1,13 +1,15 @@
-// 📁 backend/app.js – VERSION FINALE CORRIGÉE
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const dotenv = require('dotenv');
 
 dotenv.config();
+
 const app = express();
 
-/* ---------------- IMPORTS & SERVICES ---------------- */
+/* -------------------------------------------------------------------------- */
+/*                         IMPORTS BASE & SERVICES                            */
+/* -------------------------------------------------------------------------- */
 const {
   testConnection,
   isPostgreSQLConnected,
@@ -15,68 +17,82 @@ const {
   getProductByBarcode,
   getProductBySlug,
 } = require('./db/pool');
+
 const analyzeRoutes = require('./routes/analyze.routes');
 
-/* ---------------- CONFIG CORS ---------------- */
+/* -------------------------------------------------------------------------- */
+/*                              CONFIG CORS                                   */
+/* -------------------------------------------------------------------------- */
 const PROD = process.env.NODE_ENV === 'production';
 
 const allowedOrigins = (
   process.env.ALLOWED_ORIGINS ||
-  'https://frontendv3.netlify.app,https://ecolojiafrontv3.netlify.app,https://main--ecolojiafrontv3.netlify.app,https://ecolojiabackendv3.onrender.com,http://localhost:3000,http://localhost:5173,http://localhost:4173,http://localhost:5174'
+  'https://frontendv3.netlify.app,https://ecolojiafrontv3.netlify.app,https://main--ecolojiafrontv3.netlify.app,https://ecolojia-backend-working.onrender.com,http://localhost:3000,http://localhost:5173,http://localhost:5174'
 )
   .split(',')
   .map(o => o.trim());
 
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || origin.includes('.netlify.app') || allowedOrigins.includes(origin)) {
-      return cb(null, true);
-    }
-    if (!PROD) return cb(null, true);
-    return cb(new Error(`Origin ${origin} not allowed by CORS`));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'x-cron-key',
-    'x-api-key',
-    'X-Requested-With',
-    'Accept',
-    'Origin',
-  ],
-}));
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (!origin || origin.includes('.netlify.app') || allowedOrigins.includes(origin)) {
+        return cb(null, true);
+      }
+      if (!PROD) return cb(null, true);
+      return cb(new Error(`Origin ${origin} not allowed by CORS`));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-cron-key',
+      'x-api-key',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+      'x-anonymous-id' // 🔥 requis par frontend
+    ],
+  })
+);
 
-app.use(helmet({
-  crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-}));
+app.use(
+  helmet({
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-/* ---------------- FALLBACK PRODUCTS ---------------- */
-const fallbackProducts = [{
-  id: 'fallback_1',
-  title: 'Service Temporairement Indisponible',
-  slug: 'service-indisponible',
-  description: 'Le service de produits est temporairement indisponible',
-  brand: 'Système',
-  category: 'maintenance',
-  eco_score: '0.50',
-  ai_confidence: '1.00',
-  confidence_pct: 100,
-  confidence_color: 'yellow',
-  verified_status: 'system',
-  tags: ['système', 'maintenance'],
-  zones_dispo: ['FR'],
-  image_url: 'https://via.assets.so/img.jpg?w=300&h=200&tc=orange&bg=%23f3f4f6&t=Maintenance',
-  prices: { default: 0 },
-  resume_fr: 'Service en maintenance - PostgreSQL reconnexion en cours',
-  barcode: '0000000000000',
-}];
+/* -------------------------------------------------------------------------- */
+/*                            FALLBACK PRODUITS                               */
+/* -------------------------------------------------------------------------- */
+const fallbackProducts = [
+  {
+    id: 'fallback_1',
+    title: 'Service Temporairement Indisponible',
+    slug: 'service-indisponible',
+    description: 'Le service de produits est temporairement indisponible',
+    brand: 'Système',
+    category: 'maintenance',
+    eco_score: '0.50',
+    ai_confidence: '1.00',
+    confidence_pct: 100,
+    confidence_color: 'yellow',
+    verified_status: 'system',
+    tags: ['système', 'maintenance'],
+    zones_dispo: ['FR'],
+    image_url: 'https://via.assets.so/img.jpg?w=300&h=200&tc=orange&bg=%23f3f4f6&t=Maintenance',
+    prices: { default: 0 },
+    resume_fr: 'Service en maintenance - PostgreSQL reconnexion en cours',
+    barcode: '0000000000000',
+  },
+];
 
-/* ---------------- ROUTES ---------------- */
+/* -------------------------------------------------------------------------- */
+/*                              ROUTES API                                    */
+/* -------------------------------------------------------------------------- */
 app.use('/api/analyze', analyzeRoutes);
 
 app.get('/api/test-barcode', (_req, res) => {
@@ -86,6 +102,7 @@ app.get('/api/test-barcode', (_req, res) => {
 app.get('/api/products', async (req, res) => {
   try {
     const { limit = 50, offset = 0, q } = req.query;
+
     if (isPostgreSQLConnected()) {
       try {
         const products = await getAllProducts(Number(limit), Number(offset), q?.trim() || null);
