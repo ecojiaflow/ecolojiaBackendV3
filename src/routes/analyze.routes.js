@@ -22,10 +22,8 @@ router.post('/food', async (req, res) => {
 
     const scoringResult = await foodScorer.analyzeFood(productData);
 
-    console.log("🔍 Confiance calculée:", scoringResult.confidence);
-
-    // ✅ Seuil abaissé à 0.2 pour permettre l'affichage même avec données faibles
-    if (scoringResult.confidence < 0.2) {
+    // ✅ Seuil de confiance production (0.4)
+    if (scoringResult.confidence < 0.4) {
       return res.status(422).json({
         success: false,
         error: 'Données insuffisantes pour analyse fiable',
