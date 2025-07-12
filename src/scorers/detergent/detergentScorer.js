@@ -60,7 +60,7 @@ class DetergentScorer {
         allergen: true,
         penalty: -35,
         source: 'SCCS Guidelines 2024'
-      });
+      };
     }
 
     return alternatives;
