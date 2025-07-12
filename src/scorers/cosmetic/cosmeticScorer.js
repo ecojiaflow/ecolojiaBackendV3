@@ -1,67 +1,49 @@
 /**
- * ECOLOJIA - Cosmetic Scorer v1.0
+ * ECOLOJIA - Cosmetic Scorer v1.0 SIMPLE
  * Analyse scientifique des produits cosmétiques basée sur la base INCI
- * Détection perturbateurs endocriniens, allergènes, toxicité
  */
 
-const logger = require('../utils/logger');
+const { logger } = require('../../logger');
 
 class CosmeticScorer {
   constructor() {
-    // Base de données INCI simplifiée (version production nécessiterait base complète)
-    this.inciDatabase = {
-      // Perturbateurs endocriniens confirmés
-      endocrineDisruptors: {
-        'BUTYLPARABEN': { risk: 'high', source: 'ANSM 2024', effect: 'Mimétisme œstrogène' },
-        'PROPYLPARABEN': { risk: 'medium', source: 'EFSA 2023', effect: 'Perturbation hormonale' },
-        'BENZOPHENONE-3': { risk: 'high', source: 'ANSES 2024', effect: 'Absorption cutanée élevée' },
-        'TRICLOSAN': { risk: 'high', source: 'OMS 2023', effect: 'Résistance antibiotique' },
-        'BHT': { risk: 'medium', source: 'EFSA 2024', effect: 'Accumulation tissulaire' },
-        'BHA': { risk: 'high', source: 'IARC 2024', effect: 'Cancérogène possible' },
-        'PHENOXYETHANOL': { risk: 'low', source: 'ANSM 2024', effect: 'Toxique système nerveux >1%' },
-        'METHYLISOTHIAZOLINONE': { risk: 'high', source: 'SCCS 2024', effect: 'Allergisant sévère' },
-        'DMDM HYDANTOIN': { risk: 'medium', source: 'SCCS 2023', effect: 'Libérateur formaldéhyde' }
-      },
-
-      // Allergènes les plus fréquents
-      allergens: {
-        'LIMONENE': { prevalence: 'high', source: 'REVIDAL 2024' },
-        'LINALOOL': { prevalence: 'high', source: 'REVIDAL 2024' },
-        'CITRONELLOL': { prevalence: 'medium', source: 'REVIDAL 2024' },
-        'GERANIOL': { prevalence: 'medium', source: 'REVIDAL 2024' },
-        'BENZYL ALCOHOL': { prevalence: 'medium', source: 'SCCS 2024' },
-        'BENZYL BENZOATE': { prevalence: 'low', source: 'SCCS 2024' },
-        'COUMARIN': { prevalence: 'medium', source: 'REVIDAL 2024' },
-        'EUGENOL': { prevalence: 'high', source: 'REVIDAL 2024' },
-        'FARNESOL': { prevalence: 'low', source: 'REVIDAL 2024' }
-      },
-
-      // Ingrédients bénéfiques
-      beneficial: {
-        'HYALURONIC ACID': { benefit: 'Hydratation', evidence: 'high' },
-        'NIACINAMIDE': { benefit: 'Anti-inflammatoire', evidence: 'high' },
-        'RETINOL': { benefit: 'Anti-âge', evidence: 'high' },
-        'CERAMIDE': { benefit: 'Barrière cutanée', evidence: 'high' },
-        'ALOE BARBADENSIS': { benefit: 'Apaisant', evidence: 'medium' },
-        'TOCOPHEROL': { benefit: 'Antioxydant', evidence: 'high' },
-        'ASCORBIC ACID': { benefit: 'Antioxydant', evidence: 'high' },
-        'PANTHENOL': { benefit: 'Réparateur', evidence: 'medium' },
-        'GLYCERIN': { benefit: 'Humectant', evidence: 'high' }
-      },
-
-      // Catégories à éviter selon peau sensible
-      sensitiveAvoid: [
-        'ALCOHOL DENAT', 'PARFUM', 'FRAGRANCE', 'ESSENTIAL OIL',
-        'SODIUM LAURYL SULFATE', 'SODIUM LAURETH SULFATE'
-      ]
+    // Base de données INCI simplifiée mais fonctionnelle
+    this.endocrineDisruptors = {
+      'BUTYLPARABEN': { risk: 'high', source: 'ANSM 2024', effect: 'Mimétisme œstrogène' },
+      'PROPYLPARABEN': { risk: 'medium', source: 'EFSA 2023', effect: 'Perturbation hormonale' },
+      'BENZOPHENONE-3': { risk: 'high', source: 'ANSES 2024', effect: 'Absorption cutanée élevée' },
+      'TRICLOSAN': { risk: 'high', source: 'OMS 2023', effect: 'Résistance antibiotique' },
+      'BHT': { risk: 'medium', source: 'EFSA 2024', effect: 'Accumulation tissulaire' },
+      'BHA': { risk: 'high', source: 'IARC 2024', effect: 'Cancérogène possible' },
+      'PHENOXYETHANOL': { risk: 'low', source: 'ANSM 2024', effect: 'Toxique système nerveux >1%' },
+      'METHYLISOTHIAZOLINONE': { risk: 'high', source: 'SCCS 2024', effect: 'Allergisant sévère' }
     };
 
-    this.confidenceWeights = {
-      ingredientRecognition: 0.4,  // Reconnaissance ingrédients INCI
-      riskAssessment: 0.3,         // Évaluation risques
-      benefitAnalysis: 0.2,        // Analyse bénéfices
-      formulationBalance: 0.1      // Équilibre formulation
+    this.allergens = {
+      'LIMONENE': { prevalence: 'high', source: 'REVIDAL 2024' },
+      'LINALOOL': { prevalence: 'high', source: 'REVIDAL 2024' },
+      'CITRONELLOL': { prevalence: 'medium', source: 'REVIDAL 2024' },
+      'GERANIOL': { prevalence: 'medium', source: 'REVIDAL 2024' },
+      'BENZYL ALCOHOL': { prevalence: 'medium', source: 'SCCS 2024' },
+      'EUGENOL': { prevalence: 'high', source: 'REVIDAL 2024' },
+      'COUMARIN': { prevalence: 'medium', source: 'REVIDAL 2024' }
     };
+
+    this.beneficial = {
+      'HYALURONIC ACID': { benefit: 'Hydratation', evidence: 'high' },
+      'NIACINAMIDE': { benefit: 'Anti-inflammatoire', evidence: 'high' },
+      'RETINOL': { benefit: 'Anti-âge', evidence: 'high' },
+      'CERAMIDE': { benefit: 'Barrière cutanée', evidence: 'high' },
+      'ALOE BARBADENSIS': { benefit: 'Apaisant', evidence: 'medium' },
+      'TOCOPHEROL': { benefit: 'Antioxydant', evidence: 'high' },
+      'ASCORBIC ACID': { benefit: 'Antioxydant', evidence: 'high' },
+      'GLYCERIN': { benefit: 'Humectant', evidence: 'high' }
+    };
+
+    this.sensitiveAvoid = [
+      'ALCOHOL DENAT', 'PARFUM', 'FRAGRANCE', 
+      'SODIUM LAURYL SULFATE', 'SODIUM LAURETH SULFATE'
+    ];
   }
 
   /**
@@ -72,23 +54,26 @@ class CosmeticScorer {
       logger.info('🧴 Démarrage analyse cosmétique', { 
         product: productData.name || 'Produit inconnu' 
       });
-
+      
       const startTime = Date.now();
       
-      // Extraction et normalisation ingrédients INCI
-      const ingredients = this.extractInciIngredients(productData);
+      // 1. Extraction ingrédients INCI
+      const ingredients = this.extractIngredients(productData);
+      logger.info('📋 Ingrédients extraits', { count: ingredients.length });
       
-      // Analyses spécialisées
+      if (ingredients.length === 0) {
+        throw new Error('Aucun ingrédient détecté dans les données');
+      }
+      
+      // 2. Analyses spécialisées
       const riskAnalysis = this.analyzeRisks(ingredients);
-      const benefitAnalysis = this.analyzeBenefits(ingredients);
       const allergenAnalysis = this.analyzeAllergens(ingredients);
-      const formulationAnalysis = this.analyzeFormulation(ingredients);
+      const benefitAnalysis = this.analyzeBenefits(ingredients);
       
-      // Calcul score final
-      const breakdown = this.calculateBreakdown(
-        riskAnalysis, benefitAnalysis, allergenAnalysis, formulationAnalysis
-      );
+      // 3. Calcul breakdown
+      const breakdown = this.calculateBreakdown(riskAnalysis, allergenAnalysis, benefitAnalysis, ingredients);
       
+      // 4. Score final et confidence
       const finalScore = this.calculateFinalScore(breakdown);
       const confidence = this.calculateConfidence(ingredients, breakdown);
       
@@ -104,12 +89,7 @@ class CosmeticScorer {
         score: Math.round(finalScore),
         confidence: confidence.value,
         confidence_label: confidence.label,
-        breakdown: {
-          safety: breakdown.safety,
-          efficacy: breakdown.efficacy,
-          allergens: breakdown.allergens,
-          formulation: breakdown.formulation
-        },
+        breakdown,
         risk_analysis: riskAnalysis,
         benefit_analysis: benefitAnalysis,
         allergen_analysis: allergenAnalysis,
@@ -129,12 +109,12 @@ class CosmeticScorer {
   }
 
   /**
-   * Extraction et normalisation des ingrédients INCI
+   * Extraction des ingrédients INCI
    */
-  extractInciIngredients(productData) {
+  extractIngredients(productData) {
     let ingredients = [];
     
-    // Sources possibles d'ingrédients
+    // Sources possibles
     const sources = [
       productData.ingredients,
       productData.composition,
@@ -144,7 +124,6 @@ class CosmeticScorer {
 
     for (const source of sources) {
       if (source && typeof source === 'string') {
-        // Nettoyage et extraction
         const cleaned = source
           .toUpperCase()
           .replace(/INGREDIENTS?\s*[:;-]?\s*/i, '')
@@ -155,32 +134,30 @@ class CosmeticScorer {
           .filter(ing => ing.length > 2);
         
         ingredients = [...ingredients, ...cleaned];
-        break; // Utilise la première source valide
+        break;
       }
     }
 
-    // Dédoublement et nettoyage final
     return [...new Set(ingredients)].filter(ing => ing && ing.length > 0);
   }
 
   /**
-   * Analyse des risques (perturbateurs endocriniens, toxicité)
+   * Analyse des risques
    */
   analyzeRisks(ingredients) {
     const risks = {
       endocrine_disruptors: [],
       toxic_ingredients: [],
-      concentration_warnings: [],
-      overall_risk: 'low'
+      overall_risk: 'low',
+      risk_score: 100
     };
 
     let riskScore = 0;
-    let totalIngredients = ingredients.length;
 
     for (const ingredient of ingredients) {
-      // Vérification perturbateurs endocriniens
-      if (this.inciDatabase.endocrineDisruptors[ingredient]) {
-        const disruptor = this.inciDatabase.endocrineDisruptors[ingredient];
+      // Perturbateurs endocriniens
+      if (this.endocrineDisruptors[ingredient]) {
+        const disruptor = this.endocrineDisruptors[ingredient];
         risks.endocrine_disruptors.push({
           name: ingredient,
           risk_level: disruptor.risk,
@@ -188,7 +165,6 @@ class CosmeticScorer {
           source: disruptor.source
         });
         
-        // Pénalités selon niveau de risque
         switch (disruptor.risk) {
           case 'high': riskScore += 15; break;
           case 'medium': riskScore += 8; break;
@@ -196,183 +172,102 @@ class CosmeticScorer {
         }
       }
 
-      // Vérification ingrédients pour peau sensible
-      if (this.inciDatabase.sensitiveAvoid.includes(ingredient)) {
+      // Ingrédients sensibles
+      if (this.sensitiveAvoid.includes(ingredient)) {
         risks.toxic_ingredients.push({
           name: ingredient,
-          concern: 'Irritant potentiel peau sensible',
-          recommendation: 'Éviter si peau réactive'
+          concern: 'Irritant potentiel peau sensible'
         });
         riskScore += 5;
       }
     }
 
-    // Détermination risque global
-    const riskPercentage = (riskScore / totalIngredients) * 100;
+    // Risque global
+    const riskPercentage = (riskScore / ingredients.length) * 100;
     if (riskPercentage > 20) risks.overall_risk = 'high';
     else if (riskPercentage > 10) risks.overall_risk = 'medium';
-    else risks.overall_risk = 'low';
 
-    risks.risk_score = Math.min(100 - riskScore, 100);
+    risks.risk_score = Math.max(100 - riskScore, 0);
     
     return risks;
-  }
-
-  /**
-   * Analyse des bénéfices (ingrédients actifs)
-   */
-  analyzeBenefits(ingredients) {
-    const benefits = {
-      active_ingredients: [],
-      skincare_benefits: [],
-      efficacy_score: 0
-    };
-
-    let benefitScore = 0;
-
-    for (const ingredient of ingredients) {
-      if (this.inciDatabase.beneficial[ingredient]) {
-        const benefit = this.inciDatabase.beneficial[ingredient];
-        benefits.active_ingredients.push({
-          name: ingredient,
-          benefit: benefit.benefit,
-          evidence_level: benefit.evidence
-        });
-
-        // Bonus selon niveau de preuve
-        switch (benefit.evidence) {
-          case 'high': benefitScore += 10; break;
-          case 'medium': benefitScore += 6; break;
-          case 'low': benefitScore += 3; break;
-        }
-      }
-    }
-
-    // Regroupement par catégorie de bénéfices
-    const benefitCategories = {
-      'Hydratation': ['HYALURONIC ACID', 'GLYCERIN', 'CERAMIDE'],
-      'Anti-âge': ['RETINOL', 'NIACINAMIDE', 'ASCORBIC ACID'],
-      'Apaisant': ['ALOE BARBADENSIS', 'PANTHENOL'],
-      'Protection': ['TOCOPHEROL']
-    };
-
-    for (const [category, categoryIngredients] of Object.entries(benefitCategories)) {
-      const foundIngredients = ingredients.filter(ing => 
-        categoryIngredients.includes(ing)
-      );
-      
-      if (foundIngredients.length > 0) {
-        benefits.skincare_benefits.push({
-          category,
-          ingredients: foundIngredients,
-          count: foundIngredients.length
-        });
-      }
-    }
-
-    benefits.efficacy_score = Math.min(benefitScore, 100);
-    
-    return benefits;
   }
 
   /**
    * Analyse des allergènes
    */
   analyzeAllergens(ingredients) {
-    const allergens = {
+    const analysis = {
       detected_allergens: [],
       risk_level: 'low',
-      sensitive_skin_warning: false
+      total_allergens: 0,
+      allergen_score: 100
     };
 
     let allergenCount = 0;
-    let highRiskAllergens = 0;
+    let penalty = 0;
 
     for (const ingredient of ingredients) {
-      if (this.inciDatabase.allergens[ingredient]) {
-        const allergen = this.inciDatabase.allergens[ingredient];
-        allergens.detected_allergens.push({
+      if (this.allergens[ingredient]) {
+        const allergen = this.allergens[ingredient];
+        analysis.detected_allergens.push({
           name: ingredient,
           prevalence: allergen.prevalence,
           source: allergen.source
         });
         
         allergenCount++;
-        if (allergen.prevalence === 'high') {
-          highRiskAllergens++;
+        if (allergen.prevalence === 'high') penalty += 10;
+        else if (allergen.prevalence === 'medium') penalty += 6;
+        else penalty += 3;
+      }
+    }
+
+    analysis.total_allergens = allergenCount;
+    analysis.allergen_score = Math.max(100 - penalty, 0);
+    
+    if (allergenCount >= 3) analysis.risk_level = 'high';
+    else if (allergenCount >= 2) analysis.risk_level = 'medium';
+    
+    return analysis;
+  }
+
+  /**
+   * Analyse des bénéfices
+   */
+  analyzeBenefits(ingredients) {
+    const benefits = {
+      active_ingredients: [],
+      efficacy_score: 0
+    };
+
+    let efficacyScore = 0;
+
+    for (const ingredient of ingredients) {
+      if (this.beneficial[ingredient]) {
+        const benefit = this.beneficial[ingredient];
+        benefits.active_ingredients.push({
+          name: ingredient,
+          benefit: benefit.benefit,
+          evidence_level: benefit.evidence
+        });
+
+        switch (benefit.evidence) {
+          case 'high': efficacyScore += 10; break;
+          case 'medium': efficacyScore += 6; break;
+          case 'low': efficacyScore += 3; break;
         }
       }
     }
 
-    // Détermination niveau de risque allergène
-    if (highRiskAllergens >= 2 || allergenCount >= 4) {
-      allergens.risk_level = 'high';
-      allergens.sensitive_skin_warning = true;
-    } else if (allergenCount >= 2) {
-      allergens.risk_level = 'medium';
-    }
-
-    allergens.total_allergens = allergenCount;
-    allergens.allergen_score = Math.max(100 - (allergenCount * 8), 0);
+    benefits.efficacy_score = Math.min(efficacyScore, 100);
     
-    return allergens;
-  }
-
-  /**
-   * Analyse de la formulation générale
-   */
-  analyzeFormulation(ingredients) {
-    const formulation = {
-      ingredient_count: ingredients.length,
-      complexity: 'simple',
-      natural_ratio: 0,
-      synthetic_ratio: 0,
-      formulation_score: 0
-    };
-
-    // Analyse complexité formulation
-    if (ingredients.length > 30) formulation.complexity = 'complex';
-    else if (ingredients.length > 15) formulation.complexity = 'moderate';
-    else formulation.complexity = 'simple';
-
-    // Estimation ratio naturel/synthétique (simplifiée)
-    const naturalKeywords = ['EXTRACT', 'OIL', 'BUTTER', 'WAX', 'ALOE', 'ROSA'];
-    const syntheticKeywords = ['SODIUM', 'POLYMER', 'SILICONE', 'PARABEN', 'SULFATE'];
-    
-    let naturalCount = 0;
-    let syntheticCount = 0;
-
-    for (const ingredient of ingredients) {
-      if (naturalKeywords.some(keyword => ingredient.includes(keyword))) {
-        naturalCount++;
-      }
-      if (syntheticKeywords.some(keyword => ingredient.includes(keyword))) {
-        syntheticCount++;
-      }
-    }
-
-    formulation.natural_ratio = naturalCount / ingredients.length;
-    formulation.synthetic_ratio = syntheticCount / ingredients.length;
-
-    // Score formulation (favorise simplicité et ingrédients naturels)
-    let formulationScore = 100;
-    
-    // Pénalité complexité excessive
-    if (ingredients.length > 25) formulationScore -= 15;
-    else if (ingredients.length > 20) formulationScore -= 10;
-    
-    // Bonus ingrédients naturels
-    formulationScore += (formulation.natural_ratio * 20);
-    
-    formulation.formulation_score = Math.min(formulationScore, 100);
-    
-    return formulation;
+    return benefits;
   }
 
   /**
    * Calcul du breakdown détaillé
    */
-  calculateBreakdown(riskAnalysis, benefitAnalysis, allergenAnalysis, formulationAnalysis) {
+  calculateBreakdown(riskAnalysis, allergenAnalysis, benefitAnalysis, ingredients) {
     return {
       safety: {
         score: Math.round((riskAnalysis.risk_score + allergenAnalysis.allergen_score) / 2),
@@ -385,38 +280,35 @@ class CosmeticScorer {
       efficacy: {
         score: benefitAnalysis.efficacy_score,
         details: {
-          active_ingredients: benefitAnalysis.active_ingredients.length,
-          benefit_categories: benefitAnalysis.skincare_benefits.length
+          active_ingredients: benefitAnalysis.active_ingredients.length
         }
       },
       allergens: {
         score: allergenAnalysis.allergen_score,
         details: {
           total_detected: allergenAnalysis.total_allergens,
-          risk_level: allergenAnalysis.risk_level,
-          sensitive_warning: allergenAnalysis.sensitive_skin_warning
+          risk_level: allergenAnalysis.risk_level
         }
       },
       formulation: {
-        score: formulationAnalysis.formulation_score,
+        score: this.calculateFormulationScore(ingredients),
         details: {
-          complexity: formulationAnalysis.complexity,
-          ingredient_count: formulationAnalysis.ingredient_count,
-          natural_ratio: Math.round(formulationAnalysis.natural_ratio * 100)
+          complexity: this.getComplexity(ingredients.length),
+          ingredient_count: ingredients.length
         }
       }
     };
   }
 
   /**
-   * Calcul du score final pondéré
+   * Score final pondéré
    */
   calculateFinalScore(breakdown) {
     const weights = {
-      safety: 0.4,      // Sécurité prioritaire
-      efficacy: 0.3,    // Efficacité importante
-      allergens: 0.2,   // Allergènes critiques
-      formulation: 0.1  // Formulation bonus
+      safety: 0.4,
+      efficacy: 0.3,
+      allergens: 0.2,
+      formulation: 0.1
     };
 
     return Math.round(
@@ -428,37 +320,28 @@ class CosmeticScorer {
   }
 
   /**
-   * Calcul de la confidence d'analyse
+   * Calcul de la confidence
    */
   calculateConfidence(ingredients, breakdown) {
     let confidence = 0;
 
-    // Base : reconnaissance ingrédients
+    // Reconnaissance ingrédients
     const recognizedRatio = this.countRecognizedIngredients(ingredients) / ingredients.length;
-    confidence += recognizedRatio * this.confidenceWeights.ingredientRecognition;
+    confidence += recognizedRatio * 0.5;
 
-    // Qualité évaluation risques (présence d'ingrédients connus)
-    const knownRiskyIngredients = ingredients.filter(ing => 
-      this.inciDatabase.endocrineDisruptors[ing] || 
-      this.inciDatabase.allergens[ing]
-    ).length;
-    
-    const riskConfidence = Math.min(knownRiskyIngredients / 5, 1);
-    confidence += riskConfidence * this.confidenceWeights.riskAssessment;
+    // Données d'analyse
+    if (breakdown.safety.details.endocrine_disruptors > 0 || breakdown.allergens.details.total_detected > 0) {
+      confidence += 0.3;
+    }
+    if (breakdown.efficacy.details.active_ingredients > 0) {
+      confidence += 0.2;
+    }
 
-    // Qualité analyse bénéfices
-    const knownBeneficialIngredients = ingredients.filter(ing => 
-      this.inciDatabase.beneficial[ing]
-    ).length;
-    
-    const benefitConfidence = Math.min(knownBeneficialIngredients / 3, 1);
-    confidence += benefitConfidence * this.confidenceWeights.benefitAnalysis;
+    // Ajustement selon taille
+    if (ingredients.length >= 5 && ingredients.length <= 25) {
+      confidence = Math.min(confidence + 0.1, 1);
+    }
 
-    // Équilibre formulation (taille raisonnable)
-    const formulationConfidence = ingredients.length >= 5 && ingredients.length <= 25 ? 1 : 0.5;
-    confidence += formulationConfidence * this.confidenceWeights.formulationBalance;
-
-    // Conversion en labels
     let label;
     if (confidence >= 0.8) label = "Très fiable";
     else if (confidence >= 0.6) label = "Fiable";
@@ -472,83 +355,29 @@ class CosmeticScorer {
   }
 
   /**
-   * Compte les ingrédients reconnus dans la base
+   * Méthodes utilitaires
    */
   countRecognizedIngredients(ingredients) {
     return ingredients.filter(ingredient => 
-      this.inciDatabase.endocrineDisruptors[ingredient] ||
-      this.inciDatabase.allergens[ingredient] ||
-      this.inciDatabase.beneficial[ingredient] ||
-      this.inciDatabase.sensitiveAvoid.includes(ingredient)
+      this.endocrineDisruptors[ingredient] ||
+      this.allergens[ingredient] ||
+      this.beneficial[ingredient] ||
+      this.sensitiveAvoid.includes(ingredient)
     ).length;
   }
 
-  /**
-   * Génération d'alternatives cosmétiques
-   */
-  async generateAlternatives(productData, analysisResult) {
-    const alternatives = [];
-    
-    // Catégorisation du produit
-    const productType = this.detectProductType(productData);
-    
-    // Alternatives basées sur les problèmes détectés
-    if (analysisResult.risk_analysis.endocrine_disruptors.length > 0) {
-      alternatives.push({
-        type: 'Marque clean beauty',
-        reason: 'Sans perturbateurs endocriniens',
-        examples: ['Weleda', 'Dr. Hauschka', 'Melvita'],
-        benefit: 'Réduction risque hormonal'
-      });
-    }
-
-    if (analysisResult.allergen_analysis.total_allergens > 2) {
-      alternatives.push({
-        type: 'Formule hypoallergénique',
-        reason: 'Moins d\'allergènes détectés',
-        examples: ['Avène', 'La Roche-Posay', 'Eucerin'],
-        benefit: 'Meilleure tolérance cutanée'
-      });
-    }
-
-    if (analysisResult.breakdown.formulation.details.natural_ratio < 0.3) {
-      alternatives.push({
-        type: 'Cosmétiques bio/naturels',
-        reason: 'Plus d\'ingrédients naturels',
-        examples: ['Cattier', 'Logona', 'Lavera'],
-        benefit: 'Formulation plus respectueuse'
-      });
-    }
-
-    // Alternative DIY si pertinent
-    if (productType === 'soin' || productType === 'nettoyant') {
-      alternatives.push({
-        type: 'Recette maison',
-        reason: 'Contrôle total des ingrédients',
-        examples: ['Huile de jojoba + aloe vera', 'Savon de Marseille pur'],
-        benefit: 'Économique et personnalisable'
-      });
-    }
-
-    return alternatives;
+  calculateFormulationScore(ingredients) {
+    let score = 100;
+    if (ingredients.length > 25) score -= 15;
+    else if (ingredients.length > 20) score -= 10;
+    if (ingredients.length <= 10) score += 5;
+    return Math.max(score, 0);
   }
 
-  /**
-   * Détection du type de produit cosmétique
-   */
-  detectProductType(productData) {
-    const name = (productData.name || '').toLowerCase();
-    const category = (productData.category || '').toLowerCase();
-    
-    if (name.includes('crème') || name.includes('lait') || category.includes('soin')) {
-      return 'soin';
-    } else if (name.includes('shampoo') || name.includes('gel') || category.includes('nettoyant')) {
-      return 'nettoyant';
-    } else if (name.includes('maquillage') || category.includes('makeup')) {
-      return 'maquillage';
-    } else {
-      return 'autre';
-    }
+  getComplexity(ingredientCount) {
+    if (ingredientCount > 25) return 'complex';
+    if (ingredientCount > 15) return 'moderate';
+    return 'simple';
   }
 }
 
