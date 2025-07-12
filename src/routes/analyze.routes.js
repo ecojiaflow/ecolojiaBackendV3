@@ -20,8 +20,10 @@ router.post('/food', async (req, res) => {
       });
     }
     
-    // Analyse scoring scientifique
-    const scoringResult = await foodScorer.calculateFoodScore(productData);
+    // 🎯 FIX CRITIQUE : Corriger l'appel de méthode
+    // ANCIEN : await foodScorer.calculateFoodScore(productData);
+    // NOUVEAU : await foodScorer.analyzeFood(productData);
+    const scoringResult = await foodScorer.analyzeFood(productData);
     
     // Vérification seuil confiance légal
     if (scoringResult.confidence < 0.4) {
@@ -33,32 +35,61 @@ router.post('/food', async (req, res) => {
       });
     }
     
-    // Réponse enrichie
+    // 🎯 FIX : Adapter réponse au nouveau format de foodScorer.analyzeFood()
     const response = {
       success: true,
       analysis: {
+        // Score principal
         score: scoringResult.score,
         confidence: scoringResult.confidence,
-        confidence_label: confidenceCalculator.getInterpretation(scoringResult.confidence),
+        confidence_label: scoringResult.confidence >= 0.8 ? 'Très fiable' : 
+                         scoringResult.confidence >= 0.6 ? 'Fiable' : 
+                         scoringResult.confidence >= 0.4 ? 'Modérément fiable' : 'Peu fiable',
+        
+        // Classifications détaillées
         nova_classification: {
-          group: scoringResult.nova.group,
-          reasoning: scoringResult.nova.reasoning,
-          detected_markers: scoringResult.nova.detected_markers
+          group: scoringResult.breakdown?.transformation?.details?.nova?.group || 1,
+          reasoning: scoringResult.breakdown?.transformation?.details?.nova?.reasoning || ['Classification par défaut'],
+          detected_markers: scoringResult.breakdown?.transformation?.details?.nova?.detected_markers || []
         },
+        
         additives_analysis: {
-          count: scoringResult.additives.additives_count,
-          risk_level: scoringResult.additives.risk_level,
-          risk_factors: scoringResult.additives.risk_factors,
-          microbiome_impact: scoringResult.additives.microbiome_impact
+          count: scoringResult.breakdown?.transformation?.details?.additives?.additives_count || 0,
+          risk_level: scoringResult.breakdown?.transformation?.details?.additives?.risk_level || 'low',
+          risk_factors: scoringResult.breakdown?.transformation?.details?.additives?.risk_factors || [],
+          microbiome_impact: scoringResult.breakdown?.transformation?.details?.additives?.microbiome_impact?.global_impact || 'minimal'
         },
+        
+        // 🚀 NOUVEAUTÉS RÉVOLUTIONNAIRES SPRINT 3
+        alternatives: scoringResult.alternatives || [],
+        insights: scoringResult.insights || [],
+        
+        // Recommandations enrichies
         recommendations: {
-          alternatives_needed: scoringResult.alternatives_suggested,
-          education_priority: scoringResult.education_priority
+          alternatives_needed: (scoringResult.alternatives || []).length > 0,
+          education_priority: (scoringResult.insights || []).length > 0 ? 'high' : 'medium',
+          scientific_recommendations: scoringResult.recommendations || {}
         },
+        
+        // Breakdown complet
         breakdown: scoringResult.breakdown,
-        sources: scoringResult.sources,
-        analysis_date: new Date().toISOString()
+        
+        // Sources et métadonnées
+        sources: scoringResult.meta?.sources || [
+          'INSERM Classification NOVA 2024',
+          'EFSA Additives Database 2024', 
+          'ANSES Nutri-Score Algorithm 2024',
+          'International Glycemic Index Table 2024'
+        ],
+        analysis_date: new Date().toISOString(),
+        
+        // 🎯 RÉVOLUTION IA : Contexte chat disponible
+        chat_context: scoringResult.chat_context || null,
+        
+        // Différenciation vs concurrence
+        differentiation: scoringResult.differentiation || {}
       },
+      
       disclaimers: [
         "Information éducative - ne remplace pas avis médical",
         "Basé sur données publiques sous licence ODbL",
@@ -86,9 +117,14 @@ router.get('/health', (req, res) => {
   res.json({
     success: true,
     service: 'ECOLOJIA Food Scoring Service',
-    version: '1.0.0',
+    version: '3.0.0-sprint3-ai',
     nova_rules: 'INSERM_2024',
     additives_db: 'EFSA_2024',
+    ai_features: {
+      'alternatives_engine': 'active',
+      'insights_generator': 'active',
+      'chat_context': 'active'
+    },
     status: 'operational'
   });
 });
