@@ -45,7 +45,6 @@ class FoodScorer {
   constructor() {
     this.confidenceCalculator = new ConfidenceCalculator();
 
-    // Initialisation conditionnelle
     this.novaClassifier = NovaClassifier ? new NovaClassifier() : null;
     this.additivesAnalyzer = AdditivesAnalyzer ? new AdditivesAnalyzer() : null;
     this.nutriScorer = NutriScorer ? new NutriScorer() : null;
@@ -70,9 +69,6 @@ class FoodScorer {
     console.log(`🚀 FoodScorer Hybride V3.0 - Modules: [${availableModules.join(', ')}] + IA`);
   }
 
-  /**
-   * ANALYSE ALIMENTAIRE HYBRIDE - TOUJOURS FONCTIONNELLE
-   */
   async analyzeFood(productData, userProfile = {}) {
     try {
       console.log('🔬 === ANALYSE ALIMENTAIRE HYBRIDE SPRINT 3 ===');
@@ -89,21 +85,10 @@ class FoodScorer {
       console.log(`📦 Produit: ${name}`);
       console.log(`🧪 Ingrédients: ${ingredients.length} détectés`);
 
-      // ===== ANALYSES SCIENTIFIQUES AVEC FALLBACKS =====
-
-      console.log('🔬 1/6 - Classification NOVA...');
       const novaResult = this.analyzeNOVA(ingredients);
-
-      console.log('🔬 2/6 - Analyse additifs EFSA...');
       const additivesResult = this.analyzeAdditives(ingredients);
-
-      console.log('🔬 3/6 - Calcul Nutri-Score ANSES...');
       const nutriScoreResult = this.analyzeNutriScore(nutrition);
-
-      console.log('🔬 4/6 - Estimation Index Glycémique...');
       const glycemicResult = this.analyzeGlycemic(ingredients, nutrition, novaResult);
-
-      // ===== CALCUL SCORE HYBRIDE =====
 
       const scoringResult = this.calculateHybridScore({
         nova: novaResult,
@@ -114,15 +99,8 @@ class FoodScorer {
         packaging
       });
 
-      // ===== GÉNÉRATION IA (TOUJOURS ACTIVE) =====
-
-      console.log('🤖 5/6 - Génération alternatives IA...');
       const alternatives = await this.generateAlternatives(productData, userProfile, scoringResult);
-
-      console.log('🧠 6/6 - Génération insights éducatifs...');
       const insights = await this.generateInsights(productData, userProfile, scoringResult);
-
-      // ===== RÉSULTAT FINAL =====
 
       const globalConfidence = this.calculateGlobalConfidence({
         nova: novaResult,
@@ -132,8 +110,6 @@ class FoodScorer {
       });
 
       const processingTime = Date.now() - startTime;
-
-      console.log(`🎯 Score: ${Math.round(scoringResult.total)}/100 | Alt: ${alternatives.length} | Insights: ${insights.length} (${processingTime}ms)`);
 
       return {
         score: Math.round(scoringResult.total),
@@ -161,8 +137,45 @@ class FoodScorer {
       return this.getFallbackResult(productData, error);
     }
   }
+
+  analyzeNOVA(ingredients) {
+    if (this.novaClassifier) {
+      try {
+        return this.novaClassifier.classify(ingredients);
+      } catch (error) {
+        console.warn('⚠️ Erreur NOVA classifier, fallback:', error.message);
+      }
+    }
+    return {
+      group: 1,
+      confidence: 0.5,
+      reasoning: ['Fallback NOVA utilisé'],
+      detected_markers: [],
+      fallback: true
+    };
+  }
+
+  getFallbackResult(productData, error) {
+    return {
+      score: 50,
+      confidence: 0.3,
+      breakdown: {
+        transformation: { score: 50, details: { nova: { group: 1 }, additives: { total: 0 } } },
+        nutrition: { score: 50 },
+        glycemic: { score: 50 },
+        environmental: { score: 50 }
+      },
+      alternatives: [],
+      insights: [],
+      chat_context: { error: 'Analyse limitée' },
+      meta: {
+        version: '3.0-fallback',
+        error: error.message,
+        timestamp: new Date().toISOString()
+      }
+    };
+  }
 }
 
-// ✅ Export correct : instance accessible comme foodScorer.analyzeFood()
 const foodScorer = new FoodScorer();
 module.exports = foodScorer;
