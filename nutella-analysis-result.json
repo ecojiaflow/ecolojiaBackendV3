@@ -1,0 +1,64 @@
+﻿{
+    "success":  true,
+    "analysis":  {
+                     "score":  50,
+                     "confidence":  0.3,
+                     "confidence_label":  "Faible",
+                     "breakdown":  {
+                                       "transformation":  {
+                                                              "score":  50,
+                                                              "details":  {
+                                                                              "nova":  {
+                                                                                           "group":  1
+                                                                                       },
+                                                                              "additives":  {
+                                                                                                "total":  0
+                                                                                            }
+                                                                          }
+                                                          },
+                                       "nutrition":  {
+                                                         "score":  50
+                                                     },
+                                       "glycemic":  {
+                                                        "score":  50
+                                                    },
+                                       "environmental":  {
+                                                             "score":  50
+                                                         }
+                                   },
+                     "nova_classification":  {
+                                                 "group":  1
+                                             },
+                     "additives_analysis":  {
+                                                "total":  0
+                                            },
+                     "recommendations":  {
+
+                                         },
+                     "alternatives":  [
+
+                                      ],
+                     "insights":  [
+
+                                  ],
+                     "chat_context":  {
+                                          "error":  "Analyse limitée"
+                                      },
+                     "differentiation":  {
+
+                                         },
+                     "sources":  [
+
+                                 ],
+                     "meta":  {
+                                  "version":  "3.0-fallback",
+                                  "error":  "this.analyzeAdditives is not a function",
+                                  "timestamp":  "2025-07-12T12:17:46.785Z"
+                              }
+                 },
+    "disclaimers":  [
+                        "✅ ROUTE DE TEST - Tous niveaux de confiance acceptés",
+                        "Information éducative - ne remplace pas avis médical",
+                        "Basé sur données publiques sous licence ODbL"
+                    ]
+}
