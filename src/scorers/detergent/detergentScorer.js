@@ -1,18 +1,14 @@
 // src/scorers/detergent/detergentScorer.js
 /**
- * 🧽 ECOLOJIA DetergentScorer v1.1 - Avec ConfidenceCalculator Unifié
+ * 🧽 ECOLOJIA DetergentScorer v1.0 - SYNTAX FIXED
  * Analyseur scientifique pour produits ménagers et lessives
  * Base : Règlement REACH, ECHA 2024, ECOCERT, Nordic Swan
  */
 
 const { logger } = require('../../logger');
-const ConfidenceCalculator = require('../common/confidenceCalculator');
 
 class DetergentScorer {
   constructor() {
-    // Initialiser le calculateur de confiance unifié
-    this.confidenceCalculator = new ConfidenceCalculator();
-    
     // Base données scientifiques REACH + ECHA 2024
     this.harmfulIngredients = {
       // Tensioactifs non biodégradables
@@ -38,7 +34,7 @@ class DetergentScorer {
         source: 'OECD Guidelines'
       },
 
-      // Phosphates (interdits EU mais encore présents)
+      // Phosphates
       'SODIUM TRIPOLYPHOSPHATE': {
         toxicity: 'high',
         environmental: 'eutrophication',
@@ -59,72 +55,7 @@ class DetergentScorer {
         irritation: 'severe',
         allergen: true,
         penalty: -35,
-        source: 'SCCS Guidelines 2024'
-      };
-    }
-
-    return alternatives;
-  }
-
-  /**
-   * Génération d'insights éducatifs scientifiques
-   */
-  generateScientificInsights(finalScore, toxicity, biodegradability, irritation, environmental) {
-    const insights = [];
-
-    // Insight principal selon score
-    if (finalScore < 40) {
-      insights.push({
-        type: 'health_alert',
-        title: '⚠️ Produit à Risque Élevé',
-        content: 'Ce produit contient plusieurs ingrédients problématiques selon les bases REACH et ECHA 2024.',
-        scientific_backing: 'Études montrent +40% risques allergies avec ces composants',
-        source: 'European Chemicals Agency 2024'
-      });
-    } else if (finalScore < 70) {
-      insights.push({
-        type: 'improvement_needed', 
-        title: '🔄 Amélioration Possible',
-        content: 'Bon produit mais des alternatives plus écologiques existent.',
-        scientific_backing: 'Réduction -60% impact environnemental possible',
-        source: 'Life Cycle Assessment Studies'
-      });
-    } else {
-      insights.push({
-        type: 'good_choice',
-        title: '✅ Excellent Choix Écologique',
-        content: 'Produit respectueux de l\'environnement et de la santé.',
-        scientific_backing: 'Conforme aux critères EU Ecolabel les plus stricts',
-        source: 'Commission Européenne 2024'
-      });
-    }
-
-    // Insights spécifiques selon problèmes
-    if (biodegradability.score < 60) {
-      insights.push({
-        type: 'environmental_education',
-        title: '🌊 Impact Biodégradabilité',
-        content: 'Les tensioactifs non-biodégradables s\'accumulent dans les cours d\'eau.',
-        scientific_backing: 'Persistance >28 jours = bioaccumulation confirmée',
-        source: 'OECD 301 Studies & Water Framework Directive'
-      });
-    }
-
-    if (toxicity.issues.length > 0) {
-      insights.push({
-        type: 'toxicity_education',
-        title: '🔬 Recherche Écotoxicité',
-        content: 'Les études récentes révèlent des impacts sur la faune aquatique.',
-        scientific_backing: 'LC50 poissons: effets létaux à concentrations domestiques',
-        source: 'Nature Environmental Research 2024'
-      });
-    }
-
-    return insights;
-  }
-}
-
-module.exports = { DetergentScorer };CS 2024'
+        source: 'SCCS 2024'
       },
       'BENZISOTHIAZOLINONE': {
         toxicity: 'medium',
@@ -148,7 +79,7 @@ module.exports = { DetergentScorer };CS 2024'
         source: 'EPA IRIS'
       },
 
-      // Agents de blanchiment agressifs
+      // Agents de blanchiment
       'SODIUM HYPOCHLORITE': {
         toxicity: 'high',
         irritation: 'severe',
@@ -157,7 +88,7 @@ module.exports = { DetergentScorer };CS 2024'
         source: 'ECHA C&L Inventory'
       },
 
-      // Parfums synthétiques allergènes
+      // Parfums allergènes
       'LIMONENE': {
         allergen: true,
         irritation: 'mild',
@@ -178,92 +109,110 @@ module.exports = { DetergentScorer };CS 2024'
       }
     };
 
-    // Ingrédients éco-friendly avec bonus
+    // Ingrédients éco-friendly
     this.ecoIngredients = {
-      // Tensioactifs végétaux biodégradables
       'COCO GLUCOSIDE': {
         biodegradable: true,
         plant_based: true,
         gentle: true,
-        bonus: +15,
+        bonus: 15,
         source: 'ECOCERT Standards'
       },
       'LAURYL GLUCOSIDE': {
         biodegradable: true,
         plant_based: true,
-        bonus: +12,
+        bonus: 12,
         source: 'Nordic Swan Criteria'
       },
       'DECYL GLUCOSIDE': {
         biodegradable: true,
         gentle: true,
-        bonus: +10,
+        bonus: 10,
         source: 'NaTrue Certification'
       },
-
-      // Agents nettoyants naturels
       'SODIUM BICARBONATE': {
         natural: true,
         safe: true,
         biodegradable: true,
-        bonus: +20,
+        bonus: 20,
         source: 'FDA GRAS'
       },
       'CITRIC ACID': {
         natural: true,
         biodegradable: true,
-        bonus: +15,
+        bonus: 15,
         source: 'Natural derivation'
       },
       'SODIUM PERCARBONATE': {
         oxygen_bleach: true,
         biodegradable: true,
-        bonus: +18,
+        bonus: 18,
         source: 'EU Ecolabel'
       },
-
-      // Enzymes biodégradables
       'PROTEASE': {
         biodegradable: true,
         efficient: true,
-        bonus: +10,
+        bonus: 10,
         source: 'OECD 301 Test'
       },
       'AMYLASE': {
         biodegradable: true,
-        bonus: +8,
+        bonus: 8,
         source: 'Enzyme efficiency studies'
       },
       'LIPASE': {
         biodegradable: true,
-        bonus: +8,
+        bonus: 8,
         source: 'Biodegradation studies'
       },
-
-      // Huiles essentielles naturelles
       'LAVANDULA ANGUSTIFOLIA OIL': {
         natural: true,
         antibacterial: true,
-        bonus: +5,
+        bonus: 5,
         source: 'Aromatherapy research'
       },
       'TEA TREE OIL': {
         natural: true,
         antimicrobial: true,
-        bonus: +8,
+        bonus: 8,
         source: 'Clinical studies'
       }
     };
 
     // Labels et certifications
     this.certifications = {
-      'ECOCERT': { bonus: +15, credibility: 'high' },
-      'EU ECOLABEL': { bonus: +20, credibility: 'high' },
-      'NORDIC SWAN': { bonus: +18, credibility: 'high' },
-      'CRADLE TO CRADLE': { bonus: +25, credibility: 'high' },
-      'NATURE ET PROGRES': { bonus: +12, credibility: 'medium' },
-      'ECOGARANTIE': { bonus: +10, credibility: 'medium' }
+      'ECOCERT': { bonus: 15, credibility: 'high' },
+      'EU ECOLABEL': { bonus: 20, credibility: 'high' },
+      'NORDIC SWAN': { bonus: 18, credibility: 'high' },
+      'CRADLE TO CRADLE': { bonus: 25, credibility: 'high' },
+      'NATURE ET PROGRES': { bonus: 12, credibility: 'medium' },
+      'ECOGARANTIE': { bonus: 10, credibility: 'medium' }
     };
+  }
+
+  /**
+   * Calcul de confiance simple intégré
+   */
+  calculateConfidence(ingredientsCount, productName) {
+    let confidence = 0.5; // Base
+
+    // Facteur nombre d'ingrédients
+    if (ingredientsCount >= 5) confidence += 0.3;
+    else if (ingredientsCount >= 3) confidence += 0.2;
+    else if (ingredientsCount >= 1) confidence += 0.1;
+
+    // Facteur nom du produit
+    if (productName && productName.length > 3) {
+      confidence += 0.2;
+      
+      // Bonus mots-clés détergent
+      const detergentKeywords = ['lessive', 'détergent', 'nettoyant', 'liquide vaisselle', 'savon'];
+      if (detergentKeywords.some(keyword => productName.toLowerCase().includes(keyword))) {
+        confidence += 0.1;
+      }
+    }
+
+    return Math.min(1.0, confidence);
   }
 
   /**
@@ -284,28 +233,21 @@ module.exports = { DetergentScorer };CS 2024'
       
       // Score final pondéré
       const finalScore = Math.round(
-        toxicityScore.score * 0.30 +           // Écotoxicité 30%
-        biodegradabilityScore.score * 0.25 +   // Biodégradabilité 25%
-        irritationScore.score * 0.25 +         // Irritation 25%
-        environmentalScore.score * 0.20        // Impact environnemental 20%
+        toxicityScore.score * 0.30 +
+        biodegradabilityScore.score * 0.25 +
+        irritationScore.score * 0.25 +
+        environmentalScore.score * 0.20
       );
 
-      // 🎯 Calcul confiance avec le calculateur unifié
-      const confidence = this.calculateDetergentConfidence(
-        normalizedIngredients, 
-        productName, 
-        certifications
+      // Calcul confiance
+      const confidence = this.calculateConfidence(
+        normalizedIngredients.length,
+        productName
       );
 
       // Génération alternatives et insights
       const alternatives = this.generateAlternatives(finalScore, normalizedIngredients);
-      const insights = this.generateScientificInsights(
-        finalScore, 
-        toxicityScore, 
-        biodegradabilityScore,
-        irritationScore,
-        environmentalScore
-      );
+      const insights = this.generateScientificInsights(finalScore, toxicityScore, biodegradabilityScore, irritationScore, environmentalScore);
 
       return {
         score: Math.max(0, Math.min(100, finalScore)),
@@ -330,36 +272,7 @@ module.exports = { DetergentScorer };CS 2024'
   }
 
   /**
-   * 🎯 Calcul confiance spécifique détergent (utilise calculateur unifié)
-   */
-  calculateDetergentConfidence(normalizedIngredients, productName, certifications) {
-    // Calcul ratio ingrédients reconnus dans base REACH
-    const knownIngredients = normalizedIngredients.filter(ing => 
-      this.harmfulIngredients[ing] || this.ecoIngredients[ing]
-    );
-    const reachRatio = knownIngredients.length / Math.max(1, normalizedIngredients.length);
-
-    // Détection type de détergent
-    const detergentTypes = ['lessive', 'détergent', 'nettoyant', 'liquide vaisselle', 'savon'];
-    const hasDetergentType = detergentTypes.some(type => 
-      productName.toLowerCase().includes(type)
-    );
-
-    // Facteurs de confiance pour le calculateur unifié
-    const confidenceFactors = {
-      hasIngredients: normalizedIngredients.length > 0,
-      ingredientsCount: normalizedIngredients.length,
-      productName,
-      detergentType: hasDetergentType,
-      ecoLabels: certifications,
-      reachIngredientsRatio: reachRatio
-    };
-
-    return this.confidenceCalculator.calculate(confidenceFactors, 'detergent');
-  }
-
-  /**
-   * Normalisation et nettoyage des ingrédients
+   * Normalisation des ingrédients
    */
   normalizeIngredients(ingredients) {
     if (typeof ingredients === 'string') {
@@ -382,7 +295,7 @@ module.exports = { DetergentScorer };CS 2024'
   }
 
   /**
-   * Score écotoxicité aquatique (30%)
+   * Score écotoxicité (30%)
    */
   calculateToxicityScore(ingredients) {
     let score = 100;
@@ -432,7 +345,7 @@ module.exports = { DetergentScorer };CS 2024'
         nonBiodegradableCount++;
         analysis.push(`❌ ${ingredient}: Non biodégradable`);
       } else if (ecoData && ecoData.biodegradable === true) {
-        score += ecoData.bonus / 2; // Bonus réduit pour biodégradabilité
+        score += ecoData.bonus / 2;
         biodegradableCount++;
         analysis.push(`✅ ${ingredient}: Biodégradable`);
       }
@@ -450,7 +363,7 @@ module.exports = { DetergentScorer };CS 2024'
   }
 
   /**
-   * Score irritation/allergènes (25%)
+   * Score irritation (25%)
    */
   calculateIrritationScore(ingredients) {
     let score = 100;
@@ -480,7 +393,7 @@ module.exports = { DetergentScorer };CS 2024'
 
       const ecoData = this.ecoIngredients[ingredient];
       if (ecoData && ecoData.gentle) {
-        score += 5; // Bonus ingrédients doux
+        score += 5;
       }
     });
 
@@ -493,7 +406,7 @@ module.exports = { DetergentScorer };CS 2024'
   }
 
   /**
-   * Score impact environnemental (20%)
+   * Score environnemental (20%)
    */
   calculateEnvironmentalScore(ingredients, certifications) {
     let score = 100;
@@ -501,11 +414,10 @@ module.exports = { DetergentScorer };CS 2024'
     let certificationBonus = 0;
     let naturalIngredients = 0;
 
-    // Analyse ingrédients éco-friendly
     ingredients.forEach(ingredient => {
       const ecoData = this.ecoIngredients[ingredient];
       if (ecoData) {
-        ecoBonus += ecoData.bonus / 3; // Bonus réduit pour score environnemental
+        ecoBonus += ecoData.bonus / 3;
         if (ecoData.natural || ecoData.plant_based) {
           naturalIngredients++;
         }
@@ -513,11 +425,10 @@ module.exports = { DetergentScorer };CS 2024'
 
       const harmfulData = this.harmfulIngredients[ingredient];
       if (harmfulData && harmfulData.environmental) {
-        score -= 20; // Pénalité pollution
+        score -= 20;
       }
     });
 
-    // Bonus certifications
     certifications.forEach(cert => {
       const certData = this.certifications[cert.toUpperCase()];
       if (certData) {
@@ -525,7 +436,7 @@ module.exports = { DetergentScorer };CS 2024'
       }
     });
 
-    const naturalRatio = naturalIngredients / ingredients.length;
+    const naturalRatio = naturalIngredients / Math.max(1, ingredients.length);
     score = score + ecoBonus + certificationBonus + (naturalRatio * 20);
 
     return {
@@ -538,7 +449,7 @@ module.exports = { DetergentScorer };CS 2024'
   }
 
   /**
-   * Détection des problèmes majeurs
+   * Détection des problèmes
    */
   detectIssues(ingredients) {
     const issues = [];
@@ -599,12 +510,11 @@ module.exports = { DetergentScorer };CS 2024'
   }
 
   /**
-   * Génération d'alternatives plus écologiques
+   * Génération d'alternatives
    */
   generateAlternatives(score, ingredients) {
     const alternatives = [];
 
-    // Toujours proposer mieux, même si score élevé
     if (score >= 80) {
       alternatives.push({
         type: 'perfection',
@@ -634,11 +544,73 @@ module.exports = { DetergentScorer };CS 2024'
       });
     }
 
-    // Alternatives spécifiques selon problèmes détectés
     if (ingredients.some(ing => this.harmfulIngredients[ing]?.irritation === 'severe')) {
       alternatives.push({
         type: 'sensitive_skin',
         title: 'Formules Hypoallergéniques',
         description: 'Produits sans sulfates ni MIT/BIT',
         benefits: ['Testé dermatologiquement', 'Convient peaux sensibles'],
-        source: 'SC
+        source: 'SCCS Guidelines 2024'
+      });
+    }
+
+    return alternatives;
+  }
+
+  /**
+   * Génération d'insights
+   */
+  generateScientificInsights(finalScore, toxicity, biodegradability, irritation, environmental) {
+    const insights = [];
+
+    if (finalScore < 40) {
+      insights.push({
+        type: 'health_alert',
+        title: '⚠️ Produit à Risque Élevé',
+        content: 'Ce produit contient plusieurs ingrédients problématiques selon les bases REACH et ECHA 2024.',
+        scientific_backing: 'Études montrent +40% risques allergies avec ces composants',
+        source: 'European Chemicals Agency 2024'
+      });
+    } else if (finalScore < 70) {
+      insights.push({
+        type: 'improvement_needed', 
+        title: '🔄 Amélioration Possible',
+        content: 'Bon produit mais des alternatives plus écologiques existent.',
+        scientific_backing: 'Réduction -60% impact environnemental possible',
+        source: 'Life Cycle Assessment Studies'
+      });
+    } else {
+      insights.push({
+        type: 'good_choice',
+        title: '✅ Excellent Choix Écologique',
+        content: 'Produit respectueux de l\'environnement et de la santé.',
+        scientific_backing: 'Conforme aux critères EU Ecolabel les plus stricts',
+        source: 'Commission Européenne 2024'
+      });
+    }
+
+    if (biodegradability.score < 60) {
+      insights.push({
+        type: 'environmental_education',
+        title: '🌊 Impact Biodégradabilité',
+        content: 'Les tensioactifs non-biodégradables s\'accumulent dans les cours d\'eau.',
+        scientific_backing: 'Persistance >28 jours = bioaccumulation confirmée',
+        source: 'OECD 301 Studies & Water Framework Directive'
+      });
+    }
+
+    if (toxicity.issues.length > 0) {
+      insights.push({
+        type: 'toxicity_education',
+        title: '🔬 Recherche Écotoxicité',
+        content: 'Les études récentes révèlent des impacts sur la faune aquatique.',
+        scientific_backing: 'LC50 poissons: effets létaux à concentrations domestiques',
+        source: 'Nature Environmental Research 2024'
+      });
+    }
+
+    return insights;
+  }
+}
+
+module.exports = { DetergentScorer };
