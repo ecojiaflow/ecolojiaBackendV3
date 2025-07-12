@@ -1,21 +1,18 @@
 // src/scorers/detergent/detergentScorer.js
 /**
- * 🧽 ECOLOJIA DetergentScorer v1.0
+ * 🧽 ECOLOJIA DetergentScorer v1.1 - Avec ConfidenceCalculator Unifié
  * Analyseur scientifique pour produits ménagers et lessives
  * Base : Règlement REACH, ECHA 2024, ECOCERT, Nordic Swan
- * 
- * Critères d'évaluation :
- * - Écotoxicité aquatique (30%)
- * - Biodégradabilité (25%) 
- * - Irritation/Allergènes (25%)
- * - Impact environnemental (20%)
  */
 
 const { logger } = require('../../logger');
-const { calculateConfidence } = require('../common/confidenceCalculator');
+const ConfidenceCalculator = require('../common/confidenceCalculator');
 
 class DetergentScorer {
   constructor() {
+    // Initialiser le calculateur de confiance unifié
+    this.confidenceCalculator = new ConfidenceCalculator();
+    
     // Base données scientifiques REACH + ECHA 2024
     this.harmfulIngredients = {
       // Tensioactifs non biodégradables
@@ -62,7 +59,72 @@ class DetergentScorer {
         irritation: 'severe',
         allergen: true,
         penalty: -35,
-        source: 'SCCS 2024'
+        source: 'SCCS Guidelines 2024'
+      });
+    }
+
+    return alternatives;
+  }
+
+  /**
+   * Génération d'insights éducatifs scientifiques
+   */
+  generateScientificInsights(finalScore, toxicity, biodegradability, irritation, environmental) {
+    const insights = [];
+
+    // Insight principal selon score
+    if (finalScore < 40) {
+      insights.push({
+        type: 'health_alert',
+        title: '⚠️ Produit à Risque Élevé',
+        content: 'Ce produit contient plusieurs ingrédients problématiques selon les bases REACH et ECHA 2024.',
+        scientific_backing: 'Études montrent +40% risques allergies avec ces composants',
+        source: 'European Chemicals Agency 2024'
+      });
+    } else if (finalScore < 70) {
+      insights.push({
+        type: 'improvement_needed', 
+        title: '🔄 Amélioration Possible',
+        content: 'Bon produit mais des alternatives plus écologiques existent.',
+        scientific_backing: 'Réduction -60% impact environnemental possible',
+        source: 'Life Cycle Assessment Studies'
+      });
+    } else {
+      insights.push({
+        type: 'good_choice',
+        title: '✅ Excellent Choix Écologique',
+        content: 'Produit respectueux de l\'environnement et de la santé.',
+        scientific_backing: 'Conforme aux critères EU Ecolabel les plus stricts',
+        source: 'Commission Européenne 2024'
+      });
+    }
+
+    // Insights spécifiques selon problèmes
+    if (biodegradability.score < 60) {
+      insights.push({
+        type: 'environmental_education',
+        title: '🌊 Impact Biodégradabilité',
+        content: 'Les tensioactifs non-biodégradables s\'accumulent dans les cours d\'eau.',
+        scientific_backing: 'Persistance >28 jours = bioaccumulation confirmée',
+        source: 'OECD 301 Studies & Water Framework Directive'
+      });
+    }
+
+    if (toxicity.issues.length > 0) {
+      insights.push({
+        type: 'toxicity_education',
+        title: '🔬 Recherche Écotoxicité',
+        content: 'Les études récentes révèlent des impacts sur la faune aquatique.',
+        scientific_backing: 'LC50 poissons: effets létaux à concentrations domestiques',
+        source: 'Nature Environmental Research 2024'
+      });
+    }
+
+    return insights;
+  }
+}
+
+module.exports = { DetergentScorer };CS 2024'
       },
       'BENZISOTHIAZOLINONE': {
         toxicity: 'medium',
@@ -228,11 +290,11 @@ class DetergentScorer {
         environmentalScore.score * 0.20        // Impact environnemental 20%
       );
 
-      // Calcul confiance
-      const confidence = calculateConfidence(
-        normalizedIngredients.length,
-        productName,
-        'detergent'
+      // 🎯 Calcul confiance avec le calculateur unifié
+      const confidence = this.calculateDetergentConfidence(
+        normalizedIngredients, 
+        productName, 
+        certifications
       );
 
       // Génération alternatives et insights
@@ -265,6 +327,35 @@ class DetergentScorer {
       logger.error(`❌ Erreur analyse détergent: ${error.message}`);
       throw error;
     }
+  }
+
+  /**
+   * 🎯 Calcul confiance spécifique détergent (utilise calculateur unifié)
+   */
+  calculateDetergentConfidence(normalizedIngredients, productName, certifications) {
+    // Calcul ratio ingrédients reconnus dans base REACH
+    const knownIngredients = normalizedIngredients.filter(ing => 
+      this.harmfulIngredients[ing] || this.ecoIngredients[ing]
+    );
+    const reachRatio = knownIngredients.length / Math.max(1, normalizedIngredients.length);
+
+    // Détection type de détergent
+    const detergentTypes = ['lessive', 'détergent', 'nettoyant', 'liquide vaisselle', 'savon'];
+    const hasDetergentType = detergentTypes.some(type => 
+      productName.toLowerCase().includes(type)
+    );
+
+    // Facteurs de confiance pour le calculateur unifié
+    const confidenceFactors = {
+      hasIngredients: normalizedIngredients.length > 0,
+      ingredientsCount: normalizedIngredients.length,
+      productName,
+      detergentType: hasDetergentType,
+      ecoLabels: certifications,
+      reachIngredientsRatio: reachRatio
+    };
+
+    return this.confidenceCalculator.calculate(confidenceFactors, 'detergent');
   }
 
   /**
@@ -550,69 +641,4 @@ class DetergentScorer {
         title: 'Formules Hypoallergéniques',
         description: 'Produits sans sulfates ni MIT/BIT',
         benefits: ['Testé dermatologiquement', 'Convient peaux sensibles'],
-        source: 'SCCS Guidelines 2024'
-      });
-    }
-
-    return alternatives;
-  }
-
-  /**
-   * Génération d'insights éducatifs scientifiques
-   */
-  generateScientificInsights(finalScore, toxicity, biodegradability, irritation, environmental) {
-    const insights = [];
-
-    // Insight principal selon score
-    if (finalScore < 40) {
-      insights.push({
-        type: 'health_alert',
-        title: '⚠️ Produit à Risque Élevé',
-        content: 'Ce produit contient plusieurs ingrédients problématiques selon les bases REACH et ECHA 2024.',
-        scientific_backing: 'Études montrent +40% risques allergies avec ces composants',
-        source: 'European Chemicals Agency 2024'
-      });
-    } else if (finalScore < 70) {
-      insights.push({
-        type: 'improvement_needed', 
-        title: '🔄 Amélioration Possible',
-        content: 'Bon produit mais des alternatives plus écologiques existent.',
-        scientific_backing: 'Réduction -60% impact environnemental possible',
-        source: 'Life Cycle Assessment Studies'
-      });
-    } else {
-      insights.push({
-        type: 'good_choice',
-        title: '✅ Excellent Choix Écologique',
-        content: 'Produit respectueux de l\'environnement et de la santé.',
-        scientific_backing: 'Conforme aux critères EU Ecolabel les plus stricts',
-        source: 'Commission Européenne 2024'
-      });
-    }
-
-    // Insights spécifiques selon problèmes
-    if (biodegradability.score < 60) {
-      insights.push({
-        type: 'environmental_education',
-        title: '🌊 Impact Biodégradabilité',
-        content: 'Les tensioactifs non-biodégradables s\'accumulent dans les cours d\'eau.',
-        scientific_backing: 'Persistance >28 jours = bioaccumulation confirmée',
-        source: 'OECD 301 Studies & Water Framework Directive'
-      });
-    }
-
-    if (toxicity.issues.length > 0) {
-      insights.push({
-        type: 'toxicity_education',
-        title: '🔬 Recherche Écotoxicité',
-        content: 'Les études récentes révèlent des impacts sur la faune aquatique.',
-        scientific_backing: 'LC50 poissons: effets létaux à concentrations domestiques',
-        source: 'Nature Environmental Research 2024'
-      });
-    }
-
-    return insights;
-  }
-}
-
-module.exports = { DetergentScorer };
+        source: 'SC
