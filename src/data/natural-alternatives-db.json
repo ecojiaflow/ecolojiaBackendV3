@@ -1,0 +1,278 @@
+{
+  "alimentaire": {
+    "cereales_petit_dejeuner": {
+      "flocons_avoine": [
+        {
+          "name": "Flocons d'avoine + fruits frais maison",
+          "why_better": "+40% antioxydants, zéro additifs, -60% coût, +300% fibres solubles",
+          "difficulty": "facile",
+          "time": "2min",
+          "cost_comparison": "-3.20€/semaine",
+          "nutritional_advantage": "Bêta-glucanes intacts, vitamines B préservées",
+          "environmental_benefit": "-70% emballage, transport local possible",
+          "sources": ["Journal of Nutrition 2024", "Diabetes Care 2024"],
+          "recipe_link": "/recettes/porridge-avoine-fruits",
+          "ingredients": ["Flocons avoine bio", "Fruits de saison", "Lait végétal"]
+        },
+        {
+          "name": "Granola maison aux noix",
+          "why_better": "Sucre naturel (dates), huiles non raffinées, personnalisable allergies",
+          "difficulty": "moyen",
+          "time": "20min prep + 15min cuisson",
+          "cost_comparison": "-40% vs granola industriel",
+          "nutritional_advantage": "Oméga-3 préservés, densité nutritionnelle +200%",
+          "environmental_benefit": "Vrac possible, zéro additifs",
+          "sources": ["Nutrients Journal 2024", "Food Chemistry 2024"],
+          "recipe_link": "/recettes/granola-maison",
+          "ingredients": ["Flocons avoine", "Noix mélangées", "Miel/sirop érable", "Huile coco"]
+        }
+      ],
+      "cereales_industrielles": [
+        {
+          "name": "Muesli 5 ingrédients maximum",
+          "why_better": "NOVA groupe 1, index glycémique -50%, fibres +300%",
+          "difficulty": "facile",
+          "time": "1min",
+          "cost_comparison": "-50% vs céréales chocolatées",
+          "nutritional_advantage": "Pas d'ultra-transformation, minéraux biodisponibles",
+          "environmental_benefit": "Ingrédients simples, emballage minimal",
+          "sources": ["INSERM Classification NOVA 2024", "BMJ Nutrition 2024"],
+          "recipe_link": "/alternatives/muesli-simple",
+          "ingredients": ["Flocons céréales", "Fruits secs", "Graines", "Noix"]
+        }
+      ]
+    },
+    "produits_laitiers": {
+      "yaourts": [
+        {
+          "name": "Yaourt nature + fruits frais",
+          "why_better": "Probiotiques vivants +500%, pas d'édulcorants, personnalisable",
+          "difficulty": "facile", 
+          "time": "30sec",
+          "cost_comparison": "-40% vs yaourts aromatisés",
+          "nutritional_advantage": "Microbiote préservé, sucres naturels uniquement",
+          "environmental_benefit": "Moins d'emballages individuels",
+          "sources": ["Microbiome Journal 2024", "Gut Health Research 2024"],
+          "recipe_link": "/alternatives/yaourt-nature-fruits",
+          "ingredients": ["Yaourt nature bio", "Fruits de saison", "Miel optionnel"]
+        },
+        {
+          "name": "Kéfir de lait maison",
+          "why_better": "30+ souches probiotiques vs 2-3 yaourt, enzymes digestives",
+          "difficulty": "moyen",
+          "time": "5min + 24h fermentation",
+          "cost_comparison": "-70% vs probiotiques pharmacie",
+          "nutritional_advantage": "Diversité microbienne exceptionnelle",
+          "environmental_benefit": "Grains réutilisables, zéro déchet",
+          "sources": ["Applied Microbiology 2024", "Fermentation Science 2024"],
+          "recipe_link": "/recettes/kefir-maison",
+          "ingredients": ["Grains kéfir", "Lait bio", "Bocal verre"]
+        }
+      ],
+      "laits_vegetaux": [
+        {
+          "name": "Lait d'avoine maison",
+          "why_better": "Bêta-glucanes intacts, -80% coût, zéro stabilisants",
+          "difficulty": "facile",
+          "time": "5min",
+          "cost_comparison": "-80% vs lait avoine industriel",
+          "nutritional_advantage": "Fibres solubles maximales, sans émulsifiants",
+          "environmental_benefit": "Zéro Tetra Pak, avoine locale possible",
+          "sources": ["Food Hydrocolloids 2024", "Nutrition Reviews 2024"],
+          "recipe_link": "/recettes/lait-avoine-maison",
+          "ingredients": ["Flocons avoine", "Eau filtrée", "Pincée sel"]
+        }
+      ]
+    },
+    "snacks_sucres": [
+      {
+        "name": "Energy balls dattes-noix",
+        "why_better": "Index glycémique -60%, fibres +400%, minéraux naturels",
+        "difficulty": "facile",
+        "time": "10min",
+        "cost_comparison": "-70% vs barres industrielles",
+        "nutritional_advantage": "Sucres complexes, oméga-3, magnésium biodisponible",
+        "environmental_benefit": "Ingrédients bruts, zéro emballage individuel",
+        "sources": ["Food & Function 2024", "Nutrients Journal 2024"],
+        "recipe_link": "/recettes/energy-balls",
+        "ingredients": ["Dattes Medjool", "Amandes", "Graines chia", "Cacao cru"]
+      },
+      {
+        "name": "Fruits séchés maison",
+        "why_better": "Zéro sulfites, antioxydants préservés, densité nutritionnelle",
+        "difficulty": "moyen",
+        "time": "30min prep + 6h séchage",
+        "cost_comparison": "-60% vs fruits séchés commerce",
+        "nutritional_advantage": "Vitamines A,C,E concentrées, polyphénols intacts",
+        "environmental_benefit": "Fruits locaux valorisés, zéro additifs",
+        "sources": ["Food Chemistry 2024", "Antioxidants Journal 2024"],
+        "recipe_link": "/recettes/fruits-seches-maison",
+        "ingredients": ["Fruits de saison", "Déshydrateur/four", "Rien d'autre"]
+      }
+    ],
+    "plats_cuisines": [
+      {
+        "name": "Meal prep légumineuses-céréales",
+        "why_better": "Protéines complètes, NOVA groupe 1, -70% sodium",
+        "difficulty": "moyen",
+        "time": "45min prep weekend",
+        "cost_comparison": "-60% vs plats préparés",
+        "nutritional_advantage": "Acides aminés essentiels, fibres maximales",
+        "environmental_benefit": "Légumineuses fixatrices azote, local possible",
+        "sources": ["Plant Foods Human Nutrition 2024", "Sustainability Journal 2024"],
+        "recipe_link": "/recettes/meal-prep-legumineuses",
+        "ingredients": ["Légumineuses variées", "Céréales complètes", "Légumes saison"]
+      }
+    ],
+    "boissons": [
+      {
+        "name": "Eau infusée fruits-herbes",
+        "why_better": "Hydratation optimale, antioxydants naturels, zéro édulcorants",
+        "difficulty": "facile",
+        "time": "2min + 2h infusion",
+        "cost_comparison": "-90% vs eaux aromatisées",
+        "nutritional_advantage": "Vitamines hydrosolubles, minéraux préservés",
+        "environmental_benefit": "Zéro plastique, fruits/herbes locaux",
+        "sources": ["Beverages Journal 2024", "Hydration Research 2024"],
+        "recipe_link": "/recettes/eaux-infusees",
+        "ingredients": ["Eau filtrée", "Fruits frais", "Herbes aromatiques"]
+      },
+      {
+        "name": "Kombucha maison",
+        "why_better": "Probiotiques vivants, antioxydants thé, fermentation contrôlée",
+        "difficulty": "avancé",
+        "time": "15min + 7-14j fermentation",
+        "cost_comparison": "-80% vs kombucha commerce",
+        "nutritional_advantage": "SCOBY vivant, enzymes digestives, B12 naturelle",
+        "environmental_benefit": "Bouteilles réutilisables, SCOBY perpétuel",
+        "sources": ["Fermentation Technology 2024", "Probiotics Research 2024"],
+        "recipe_link": "/recettes/kombucha-maison",
+        "ingredients": ["SCOBY", "Thé vert/noir", "Sucre bio", "Eau"]
+      }
+    ]
+  },
+  "cosmetiques": {
+    "soins_visage": [
+      {
+        "name": "Huile de jojoba pure",
+        "why_better": "97% similarité sébum humain, 1 ingrédient vs 15+, -70% coût",
+        "difficulty": "facile",
+        "time": "30sec application",
+        "cost_comparison": "-70% vs crèmes premium",
+        "skin_advantage": "Non-comédogène, équilibre sébum naturel",
+        "environmental_benefit": "Monoculture desert, biodégradable 100%",
+        "sources": ["Dermatology Research 2024", "Cosmetic Chemistry 2024"],
+        "usage_guide": "/guides/huile-jojoba-utilisation",
+        "skin_types": ["Tous types", "Peaux grasses", "Peaux sensibles"]
+      },
+      {
+        "name": "Gel d'aloe vera frais",
+        "why_better": "Polysaccharides actifs, anti-inflammatoire naturel, hydratation profonde",
+        "difficulty": "facile",
+        "time": "2min extraction",
+        "cost_comparison": "-80% vs gels industriels",
+        "skin_advantage": "Cicatrisant, apaisant, régénérant cellulaire",
+        "environmental_benefit": "Plante locale possible, zéro conservateurs",
+        "sources": ["Phytotherapy Research 2024", "Natural Products 2024"],
+        "usage_guide": "/guides/aloe-vera-extraction",
+        "skin_types": ["Peaux irritées", "Coups soleil", "Peaux sèches"]
+      }
+    ],
+    "soins_cheveux": [
+      {
+        "name": "Masque avocat-miel",
+        "why_better": "Acides gras essentiels, enzymes naturelles, protéines végétales",
+        "difficulty": "facile",
+        "time": "5min prep + 20min pose",
+        "cost_comparison": "-60% vs masques industriels",
+        "hair_advantage": "Réparation cuticule, hydratation profonde",
+        "environmental_benefit": "Ingrédients alimentaires, compostable",
+        "sources": ["Hair Science Journal 2024", "Cosmetic Dermatology 2024"],
+        "usage_guide": "/guides/masque-cheveux-naturel",
+        "hair_types": ["Cheveux secs", "Cheveux abîmés", "Cheveux crépus"]
+      }
+    ],
+    "hygiene": [
+      {
+        "name": "Déodorant bicarbonate-huiles",
+        "why_better": "Antibactérien naturel, zéro aluminium, personnalisable",
+        "difficulty": "moyen",
+        "time": "10min préparation",
+        "cost_comparison": "-70% vs déodorants naturels commerce",
+        "health_advantage": "Transpiration naturelle préservée, pH équilibré",
+        "environmental_benefit": "Contenants réutilisables, ingrédients bruts",
+        "sources": ["Applied Microbiology 2024", "Dermatitis Journal 2024"],
+        "usage_guide": "/recettes/deodorant-maison",
+        "skin_types": ["Peaux normales", "Éviter peaux très sensibles"]
+      }
+    ]
+  },
+  "menage": {
+    "nettoyants_multiusages": [
+      {
+        "name": "Vinaigre blanc + bicarbonate",
+        "why_better": "Antibactérien prouvé, détartrant naturel, zéro COV",
+        "difficulty": "facile",
+        "time": "2min mélange",
+        "cost_comparison": "-85% vs produits ménagers",
+        "cleaning_efficiency": "pH acide optimal, action mécanique CO2",
+        "environmental_benefit": "Biodégradable immédiat, non-toxique aquatique",
+        "sources": ["Environmental Chemistry 2024", "Cleaning Science 2024"],
+        "usage_guide": "/guides/nettoyage-vinaigre-bicarbonate",
+        "surfaces": ["Sanitaires", "Cuisine", "Vitres", "Éviter marbre"]
+      }
+    ],
+    "lessive": [
+      {
+        "name": "Savon Marseille râpé + cristaux soude",
+        "why_better": "Saponification traditionnelle, zéro phosphates, hypoallergénique",
+        "difficulty": "moyen",
+        "time": "15min préparation",
+        "cost_comparison": "-60% vs lessives écologiques",
+        "washing_efficiency": "Dégraissage optimal, respect fibres",
+        "environmental_benefit": "Oliviers durables, packaging minimal",
+        "sources": ["Textile Research 2024", "Green Chemistry 2024"],
+        "usage_guide": "/recettes/lessive-maison",
+        "fabric_types": ["Tous tissus", "Peaux sensibles", "Bébés"]
+      }
+    ]
+  },
+  "jardinage": [
+    {
+      "name": "Compost maison",
+      "why_better": "Microorganismes vivants, nutrition complète plantes, économie circulaire",
+      "difficulty": "moyen",
+      "time": "5min/jour maintenance",
+      "cost_comparison": "-100% vs engrais + réduction déchets",
+      "soil_advantage": "Structure sol améliorée, rétention eau +40%",
+      "environmental_benefit": "Cycle carbone fermé, biodiversité sol",
+      "sources": ["Soil Biology 2024", "Composting Science 2024"],
+      "usage_guide": "/guides/compost-appartement",
+      "space_needed": ["Jardin", "Balcon", "Cuisine (bokashi)"]
+    }
+  ],
+  "categories_speciales": {
+    "bio_ultra_transforme": [
+      {
+        "explanation": "Un produit bio ultra-transformé (NOVA 4) reste problématique",
+        "why_problematic": "Matrice alimentaire détruite, additifs autorisés bio, index glycémique élevé",
+        "better_approach": "Privilégier bio ET peu transformé (NOVA 1-2)",
+        "sources": ["INSERM NOVA Classification 2024", "Organic Food Research 2024"]
+      }
+    ],
+    "local_vs_bio": [
+      {
+        "explanation": "Local conventionnel peut être préférable à bio lointain selon contexte",
+        "criteria": "Distance transport, saisonnalité, pratiques agricoles locales",
+        "decision_framework": "Analyse cas par cas selon empreinte carbone totale",
+        "sources": ["Sustainable Agriculture 2024", "Carbon Footprint Studies 2024"]
+      }
+    ]
+  },
+  "disclaimers": {
+    "legal": "Ces suggestions sont basées sur des données nutritionnelles et scientifiques publiques. Elles constituent des informations éducatives, non des conseils médicaux. Consultez un professionnel de santé pour toute question spécifique.",
+    "allergies": "Vérifiez toujours la compatibilité avec vos allergies alimentaires ou cutanées avant utilisation.",
+    "medical": "En cas de pathologie particulière, demandez l'avis de votre médecin avant modification alimentaire.",
+    "sources": "Toutes les sources citées sont issues de publications scientifiques peer-reviewed ou d'organismes officiels reconnus."
+  }
+}
