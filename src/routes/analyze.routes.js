@@ -1,9 +1,14 @@
+// 📝 FICHIER COMPLET : src/routes/analyze.routes.js
+// Avec intégration DetergentScorer
+
 const { Router } = require('express');
 const foodScorer = require('../scorers/food/foodScorer');
 const CosmeticScorer = require('../scorers/cosmetic/cosmeticScorer');
+const { DetergentScorer } = require('../scorers/detergent/detergentScorer'); // ✨ NOUVEAU
 
 const router = Router();
 const cosmeticScorer = new CosmeticScorer();
+const detergentScorer = new DetergentScorer(); // ✨ NOUVEAU
 
 /**
  * POST /analyze/food
@@ -283,6 +288,382 @@ router.post('/cosmetic/dev', async (req, res) => {
   }
 });
 
+// ===== ✨ NOUVELLES ROUTES DÉTERGENTS ===== 
+
+/**
+ * 🧽 POST /analyze/detergent
+ * Analyse complète d'un produit ménager/lessive selon REACH/ECHA 2024
+ */
+router.post('/detergent', async (req, res) => {
+  try {
+    console.log('🧽 Requête analyse détergent reçue:', req.body);
+
+    const { product_name, ingredients, composition, certifications, brand, category } = req.body;
+
+    // Validation input
+    if (!ingredients && !composition) {
+      return res.status(400).json({
+        success: false,
+        error: 'Données insuffisantes',
+        message: 'Au moins un champ requis : ingredients ou composition',
+        required_fields: ['ingredients', 'composition'],
+        expected_format: {
+          ingredients: "string ou array d'ingrédients",
+          product_name: "string (optionnel)", 
+          certifications: "array (optionnel, ex: ['EU ECOLABEL', 'ECOCERT'])",
+          category: "string (optionnel, ex: 'lessive', 'détergent')",
+          brand: "string (optionnel)"
+        }
+      });
+    }
+
+    // Préparation des données produit
+    const ingredientsList = ingredients || composition;
+    const productName = product_name || '';
+    const certificationsList = Array.isArray(certifications) ? certifications : 
+                              typeof certifications === 'string' ? [certifications] : [];
+
+    console.log('📋 Données détergent préparées:', {
+      name: productName,
+      ingredients_count: Array.isArray(ingredientsList) ? ingredientsList.length : ingredientsList.split(',').length,
+      certifications: certificationsList,
+      category: category || 'détergent'
+    });
+
+    // Analyse avec le DetergentScorer
+    const analysisResult = await detergentScorer.analyzeDetergent(
+      ingredientsList,
+      productName,
+      certificationsList
+    );
+
+    // Vérification seuil de confiance (cohérent avec autres endpoints)
+    if (analysisResult.confidence < 0.4) {
+      console.warn('⚠️ Confidence détergent trop faible:', { 
+        confidence: analysisResult.confidence,
+        threshold: 0.4 
+      });
+      
+      return res.status(422).json({
+        success: false,
+        error: 'Analyse non fiable',
+        message: 'Les données fournies ne permettent pas une analyse suffisamment fiable',
+        confidence: analysisResult.confidence,
+        min_confidence_required: 0.4,
+        suggestions: [
+          'Fournir le nom complet du produit',
+          'Vérifier la liste complète des ingrédients',
+          'Inclure les certifications éventuelles',
+          'S\'assurer de l\'orthographe des composants'
+        ]
+      });
+    }
+
+    // Enrichissement avec métadonnées produit
+    const enrichedAnalysis = {
+      ...analysisResult,
+      product_info: {
+        name: productName,
+        category: category || 'détergent',
+        brand: brand || null,
+        certifications_declared: certificationsList
+      },
+      meta: {
+        ...analysisResult.meta,
+        processing_time_ms: Date.now(),
+        analysis_version: 'detergent-v1.0',
+        data_sources: ['REACH Database', 'ECHA 2024', 'EU Ecolabel', 'OECD Guidelines']
+      }
+    };
+
+    // Disclaimers éducatifs spécifiques détergents
+    const disclaimers = [
+      "ℹ️ Analyse basée sur la réglementation REACH et les bases ECHA 2024",
+      "🌊 Impact environnemental évalué selon critères EU Ecolabel et Nordic Swan", 
+      "⚠️ Les sensibilités cutanées sont individuelles. Test préalable recommandé",
+      "🔬 Ces informations sont éducatives et ne remplacent pas l'avis de professionnels",
+      "📚 Sources : REACH, ECHA, OECD, SCCS, études biodégradabilité 2024"
+    ];
+
+    console.log('✅ Analyse détergent réussie:', {
+      score: analysisResult.score,
+      confidence: analysisResult.confidence,
+      issues_detected: analysisResult.detected_issues?.length || 0,
+      certifications_found: analysisResult.certifications_detected?.length || 0,
+      alternatives_count: analysisResult.alternatives?.length || 0
+    });
+
+    // Réponse structurée
+    res.json({
+      success: true,
+      type: 'detergent',
+      product: {
+        name: productName,
+        category: category || 'détergent',
+        brand: brand || null
+      },
+      analysis: enrichedAnalysis,
+      disclaimers,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Erreur analyse détergent:', {
+      error: error.message,
+      stack: error.stack,
+      body: req.body
+    });
+
+    res.status(500).json({
+      success: false,
+      error: 'Erreur interne du serveur',
+      message: 'Impossible d\'analyser ce produit détergent',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+/**
+ * 🧽 POST /analyze/detergent/dev
+ * Version développement - ignore seuil de confiance
+ */
+router.post('/detergent/dev', async (req, res) => {
+  try {
+    console.log('🧪 Requête analyse détergent DEV (seuil ignoré):', req.body);
+
+    const { product_name, ingredients, composition, certifications, brand, category } = req.body;
+
+    if (!ingredients && !composition) {
+      return res.status(400).json({
+        success: false,
+        error: 'Données insuffisantes pour analyse détergent',
+        message: 'Au moins un champ requis : ingredients ou composition',
+        example: {
+          ingredients: "AQUA, SODIUM LAURYL SULFATE, SODIUM TRIPOLYPHOSPHATE, PARFUM",
+          product_name: "Lessive Multi-Usage",
+          certifications: ["EU ECOLABEL"],
+          category: "lessive"
+        }
+      });
+    }
+
+    // Préparation des données
+    const ingredientsList = ingredients || composition;
+    const productName = product_name || 'Produit Test DEV';
+    const certificationsList = Array.isArray(certifications) ? certifications : 
+                              typeof certifications === 'string' ? [certifications] : [];
+
+    console.log('📋 Données détergent DEV préparées:', {
+      name: productName,
+      ingredients: ingredientsList,
+      certifications: certificationsList
+    });
+
+    // Analyse SANS vérification de confidence
+    const analysisResult = await detergentScorer.analyzeDetergent(
+      ingredientsList,
+      productName,
+      certificationsList
+    );
+    
+    // Ajout flags développement
+    const devAnalysis = {
+      ...analysisResult,
+      meta: {
+        ...analysisResult.meta,
+        dev_mode: true,
+        confidence_threshold_ignored: true,
+        analysis_timestamp: new Date().toISOString(),
+        debug_info: {
+          original_ingredients: ingredientsList,
+          processed_ingredients: analysisResult.processed_ingredients || null,
+          confidence_details: `${analysisResult.confidence} (seuil 0.4 ignoré)`
+        }
+      }
+    };
+
+    // Disclaimers spécifiques développement
+    const disclaimers = [
+      "🧪 MODE DÉVELOPPEMENT : Seuil de confidence ignoré pour tests",
+      "ℹ️ Analyse basée sur REACH/ECHA - Résultats à interpréter selon confidence",
+      "⚠️ Version test - Validation recommandée avec route production",
+      "📚 Sources : REACH Database, ECHA 2024, EU Ecolabel criteria"
+    ];
+
+    console.log('✅ Analyse détergent DEV réussie:', {
+      score: analysisResult.score,
+      confidence: analysisResult.confidence,
+      dev_mode: true,
+      confidence_ignored: true
+    });
+
+    res.json({
+      success: true,
+      type: 'detergent_dev',
+      product: {
+        name: productName,
+        category: category || 'détergent',
+        brand: brand || null
+      },
+      analysis: devAnalysis,
+      disclaimers,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Erreur analyse détergent DEV:', { 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+    
+    res.status(500).json({
+      success: false,
+      error: 'Erreur interne du serveur',
+      message: 'Impossible d\'analyser ce produit détergent (mode dev)',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+/**
+ * 📚 GET /analyze/detergent/docs
+ * Documentation API détergents
+ */
+router.get('/detergent/docs', (req, res) => {
+  res.json({
+    title: '🧽 ECOLOJIA - API Analyse Détergents & Produits Ménagers',
+    version: '1.0',
+    description: 'Analyse scientifique des produits ménagers selon réglementation REACH et critères ECHA 2024',
+    
+    endpoints: {
+      'POST /api/analyze/detergent': {
+        description: 'Analyse complète avec seuil de confiance (production)',
+        required: ['ingredients ou composition'],
+        optional: ['product_name', 'certifications', 'category', 'brand'],
+        response: 'Score + alternatives + insights scientifiques',
+        confidence_threshold: 0.4
+      },
+      'POST /api/analyze/detergent/dev': {
+        description: 'Mode développement - ignore seuil confiance',
+        required: ['ingredients ou composition'],
+        response: 'Analyse complète + métadonnées debug',
+        confidence_threshold: 'ignoré'
+      },
+      'GET /api/analyze/detergent/docs': {
+        description: 'Documentation complète API détergents'
+      }
+    },
+
+    scoring_criteria: {
+      ecotoxicity: {
+        weight: '30%',
+        description: 'Toxicité aquatique selon bases ECHA',
+        sources: ['REACH Database', 'ECHA C&L Inventory', 'OECD Guidelines']
+      },
+      biodegradability: {
+        weight: '25%', 
+        description: 'Tests biodégradation OECD 301',
+        sources: ['EU Ecolabel criteria', 'Nordic Swan standards']
+      },
+      irritation: {
+        weight: '25%',
+        description: 'Allergènes et irritants cutanés',
+        sources: ['SCCS opinions', 'Cosmetic Regulation EC']
+      },
+      environmental: {
+        weight: '20%',
+        description: 'Impact global + certifications',
+        sources: ['Life Cycle Assessment', 'Ecolabel criteria']
+      }
+    },
+
+    harmful_ingredients_detected: {
+      'high_penalty': [
+        'SODIUM TRIPOLYPHOSPHATE (-40 pts) - Eutrophisation',
+        'DICHLOROMETHANE (-50 pts) - Cancérigène suspecté',
+        'METHYLISOTHIAZOLINONE (-35 pts) - Allergène sévère',
+        'ALKYLBENZENE SULFONATE (-30 pts) - Non biodégradable'
+      ],
+      'medium_penalty': [
+        'SODIUM LAURYL SULFATE (-25 pts) - Irritant sévère',
+        'BENZISOTHIAZOLINONE (-20 pts) - Allergène',
+        'TETRASODIUM PYROPHOSPHATE (-20 pts) - Eutrophisation'
+      ]
+    },
+
+    eco_ingredients_bonus: [
+      'COCO GLUCOSIDE (+15 pts) - Tensioactif végétal',
+      'SODIUM BICARBONATE (+20 pts) - Agent naturel sûr',
+      'SODIUM PERCARBONATE (+18 pts) - Blanchiment oxygéné',
+      'CITRIC ACID (+15 pts) - Acidifiant naturel',
+      'PROTEASE (+10 pts) - Enzyme biodégradable'
+    ],
+
+    certifications_supported: {
+      'EU ECOLABEL': '+20 pts - Label officiel européen',
+      'NORDIC SWAN': '+18 pts - Label nordique strict',  
+      'ECOCERT': '+15 pts - Certification bio française',
+      'CRADLE TO CRADLE': '+25 pts - Économie circulaire',
+      'NATURE ET PROGRES': '+12 pts - Standard bio exigeant'
+    },
+
+    example_requests: {
+      basic: {
+        ingredients: "AQUA, COCO GLUCOSIDE, SODIUM BICARBONATE, CITRIC ACID",
+        product_name: "Lessive Écologique"
+      },
+      with_certifications: {
+        ingredients: "AQUA, LAURYL GLUCOSIDE, SODIUM PERCARBONATE, PROTEASE, PARFUM",
+        product_name: "Détergent Multi-Surface Bio",
+        certifications: ["EU ECOLABEL", "ECOCERT"],
+        category: "nettoyant multi-surfaces",
+        brand: "Marque Verte"
+      },
+      problematic: {
+        ingredients: "AQUA, SODIUM LAURYL SULFATE, SODIUM TRIPOLYPHOSPHATE, METHYLISOTHIAZOLINONE, BHA",
+        product_name: "Lessive Conventionnelle"
+      }
+    },
+
+    response_structure: {
+      success: 'boolean',
+      type: 'detergent',
+      product: {
+        name: 'string',
+        category: 'string', 
+        brand: 'string'
+      },
+      analysis: {
+        score: 'number (0-100)',
+        confidence: 'number (0-1)',
+        breakdown: {
+          ecotoxicity: 'object - Score + pénalités toxicité',
+          biodegradability: 'object - Ratio biodégradable + analyse',
+          irritation: 'object - Allergènes + irritants',
+          environmental: 'object - Impact + certifications'
+        },
+        detected_issues: 'array - Problèmes critiques détectés',
+        certifications_detected: 'array - Labels trouvés',
+        alternatives: 'array - Suggestions plus écologiques',
+        insights: 'array - Éducation scientifique',
+        methodology: 'string - Sources utilisées'
+      }
+    },
+
+    scientific_sources: [
+      'REACH Database (Registration, Evaluation, Authorisation of Chemicals)',
+      'ECHA 2024 (European Chemicals Agency)',
+      'EU Ecolabel criteria for detergents',
+      'OECD Guidelines for biodegradability testing',
+      'SCCS (Scientific Committee on Consumer Safety)',
+      'Nordic Swan Ecolabelling criteria',
+      'Water Framework Directive 2000/60/EC'
+    ],
+
+    analysis_methodology: 'Scoring holistique basé sur réglementation REACH, critères EU Ecolabel, et études récentes biodégradabilité/écotoxicité (2024)'
+  });
+});
+
 /**
  * GET /analyze/cosmetic/docs
  * Documentation API cosmétique
@@ -364,18 +745,23 @@ router.get('/health', (req, res) => {
   res.json({
     success: true,
     service: 'ECOLOJIA Scoring Engine',
-    version: '3.0-sprint2-cosmetic',
+    version: '3.0-sprint3-complete', // ✨ UPDATED
     features: {
       food: ['NOVA', 'EFSA', 'NutriScore', 'IG', 'Alternatives IA', 'Insights IA', 'Chat IA'],
-      cosmetic: ['INCI Analysis', 'Endocrine Disruptors', 'Allergens', 'Benefit Evaluation']
+      cosmetic: ['INCI Analysis', 'Endocrine Disruptors', 'Allergens', 'Benefit Evaluation'],
+      detergent: ['REACH Analysis', 'Ecotoxicity', 'Biodegradability', 'EU Ecolabel'] // ✨ NEW
     },
     endpoints: [
       'POST /analyze/food',
       'POST /analyze/cosmetic',
       'POST /analyze/cosmetic/dev',
-      'GET /analyze/cosmetic/docs'
+      'GET /analyze/cosmetic/docs',
+      'POST /analyze/detergent', // ✨ NEW
+      'POST /analyze/detergent/dev', // ✨ NEW
+      'GET /analyze/detergent/docs' // ✨ NEW
     ],
-    status: 'operational'
+    status: 'operational',
+    coverage: 'Alimentaire + Cosmétique + Détergent = Solution complète ECOLOJIA' // ✨ NEW
   });
 });
 
