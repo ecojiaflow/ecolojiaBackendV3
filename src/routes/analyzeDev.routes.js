@@ -2,7 +2,8 @@
 // 🔧 ROUTE DE TEST - NE BLOQUE PAS SUR confidence < 0.4
 
 const { Router } = require('express');
-const foodScorer = require('../scorers/food/foodScorer');
+const FoodScorer = require('../scorers/food/foodScorer');
+const foodScorer = new FoodScorer(); // ✅ FIX ICI
 
 const router = Router();
 
@@ -29,7 +30,9 @@ router.post('/dev', async (req, res) => {
         score: scoringResult.score,
         grade: scoringResult.grade,
         confidence: scoringResult.confidence,
-        confidence_label: scoringResult.confidence >= 0.8 ? 'Très fiable' : scoringResult.confidence >= 0.6 ? 'Fiable' : 'Faible',
+        confidence_label:
+          scoringResult.confidence >= 0.8 ? 'Très fiable' :
+          scoringResult.confidence >= 0.6 ? 'Fiable' : 'Faible',
         improvement: scoringResult.improvement,
         breakdown: scoringResult.breakdown,
         nova_classification: scoringResult.breakdown?.transformation?.details?.nova || {},
