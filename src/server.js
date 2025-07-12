@@ -4,7 +4,7 @@ const helmet = require('helmet');
 const dotenv = require('dotenv');
 const visionOCR = require('./services/ocr/visionOCR');
 const analyzeRoutes = require('./routes/analyze.routes');
-// ⭐ AJOUT 1 : Importer les routes chat IA
+const analyzeDevRoutes = require('./routes/analyzeDev.routes'); // ✅ NOUVELLE ROUTE
 const chatRoutes = require('./routes/chat.routes');
 
 dotenv.config();
@@ -13,7 +13,6 @@ const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 
-// CORS sécurisé
 const allowedOrigins = [
   'https://frontendv3.netlify.app',
   'https://ecolojiafrontv3.netlify.app',
@@ -47,7 +46,6 @@ app.use(express.urlencoded({ extended: true }));
 // --- ROUTES PRODUITS --- //
 const productRoutes = express.Router();
 
-// ✅ Route OCR IA réelle
 productRoutes.post('/analyze-photos', async (req, res) => {
   try {
     const { barcode, photos } = req.body;
@@ -81,7 +79,7 @@ productRoutes.post('/analyze-photos', async (req, res) => {
   }
 });
 
-// --- AUTRES ROUTES FAKE (fallback) TEMPORAIRES --- //
+// --- FAKE ROUTES PRODUITS TEMPORAIRES --- //
 productRoutes.get('/', (req, res) => {
   res.json([
     {
@@ -164,13 +162,13 @@ healthRoutes.get('/health', (req, res) => {
 app.use('/api/products', productRoutes);
 app.use('/api', healthRoutes);
 app.use('/api/analyze', analyzeRoutes);
-// ⭐ AJOUT 2 : Connecter les routes chat IA
+app.use('/api/analyze', analyzeDevRoutes); // ✅ NOUVELLE ROUTE TEST DEBUG
 app.use('/api/chat', chatRoutes);
 
+// --- ROUTE ROOT --- //
 app.get('/', (req, res) => {
   res.json({
     message: 'Ecolojia API - Assistant IA Scientifique Révolutionnaire',
-    // ⭐ AJOUT 3 : Mettre à jour version vers 3.0
     version: '3.0.0-sprint3-ia',
     environment: process.env.NODE_ENV || 'production',
     timestamp: new Date().toISOString(),
@@ -178,29 +176,26 @@ app.get('/', (req, res) => {
       'OCR Google Vision': 'active',
       'Classification NOVA': 'active',
       'Additifs EFSA': 'active',
-      // ⭐ AJOUT 4 : Ajouter features IA Sprint 3
       'IA Alternatives': 'active',
       'IA Insights': 'active',
       'Chat IA': 'active'
     },
     endpoints: {
       'POST /api/products/analyze-photos': 'OCR IA Google Vision',
-      'POST /api/analyze/food': 'Classification NOVA + Additifs EFSA',
+      'POST /api/analyze/food': 'Scoring complet avec seuil de confiance',
+      'POST /api/analyze/dev': 'Scoring sans blocage confiance faible',
       'GET /api/analyze/health': 'Status scoring scientifique',
-      // ⭐ AJOUT 5 : Documenter nouvelles routes IA
       'POST /api/chat/message': 'Chat IA conversationnel',
       'POST /api/chat/quick/:questionType': 'Réponses rapides IA',
       'GET /api/chat/suggestions/:category': 'Suggestions questions',
-      'POST /api/chat/context/alternatives': 'Alternatives pour contexte',
-      'POST /api/chat/context/insights': 'Insights pour contexte',
-      'GET /api/chat/health': 'Health check chat IA',
-      'GET /api/products': 'fallback mock',
-      'GET /api/products/:slug': 'fallback mock',
+      'POST /api/chat/context/alternatives': 'Alternatives IA',
+      'POST /api/chat/context/insights': 'Insights IA',
+      'GET /api/chat/health': 'Health check chat IA'
     }
   });
 });
 
-// --- ERREURS --- //
+// --- GESTION DES ERREURS --- //
 app.use((error, req, res, next) => {
   console.error('❌ Erreur serveur:', error);
   res.status(500).json({
@@ -216,14 +211,15 @@ app.use((req, res) => {
     available_endpoints: [
       'POST /api/products/analyze-photos',
       'POST /api/analyze/food',
+      'POST /api/analyze/dev',
       'GET /api/analyze/health',
-      // ⭐ AJOUT 6 : Ajouter routes IA dans endpoints disponibles
       'POST /api/chat/message',
       'POST /api/chat/quick/:questionType',
       'GET /api/chat/suggestions/:category',
+      'POST /api/chat/context/alternatives',
+      'POST /api/chat/context/insights',
       'GET /api/chat/health',
-      'GET /api/products',
-      'GET /health'
+      'GET /api/products'
     ]
   });
 });
@@ -233,7 +229,6 @@ app.listen(PORT, HOST, () => {
   console.log(`🔬 Classification NOVA active`);
   console.log(`🧪 Base additifs EFSA active`);
   console.log(`📷 OCR Google Vision active`);
-  // ⭐ AJOUT 7 : Confirmer activation services IA
   console.log(`🤖 Assistant IA Sprint 3 ACTIF`);
   console.log(`💡 Alternatives automatiques ACTIVES`);
   console.log(`📚 Insights scientifiques ACTIFS`);
