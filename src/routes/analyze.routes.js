@@ -22,7 +22,10 @@ router.post('/food', async (req, res) => {
 
     const scoringResult = await foodScorer.analyzeFood(productData);
 
-    if (scoringResult.confidence < 0.4) {
+    console.log("🔍 Confiance calculée:", scoringResult.confidence);
+
+    // ✅ Seuil abaissé à 0.2 pour permettre l'affichage même avec données faibles
+    if (scoringResult.confidence < 0.2) {
       return res.status(422).json({
         success: false,
         error: 'Données insuffisantes pour analyse fiable',
@@ -38,7 +41,7 @@ router.post('/food', async (req, res) => {
         confidence: scoringResult.confidence,
         confidence_label: scoringResult.confidence >= 0.8 ? 'Très fiable' : 
                          scoringResult.confidence >= 0.6 ? 'Fiable' : 
-                         scoringResult.confidence >= 0.4 ? 'Modérément fiable' : 'Peu fiable',
+                         scoringResult.confidence >= 0.4 ? 'Modérément fiable' : 'Faible',
 
         nova_classification: {
           group: scoringResult.breakdown?.transformation?.details?.nova?.group || 1,
