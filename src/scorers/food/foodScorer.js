@@ -1,7 +1,5 @@
-/**
- * FOOD SCORER HYBRIDE V3.0 – SPRINT 3 IA
- * Correction intégrale : analyseAdditives bien définie
- */
+// 📁 Fichier : src/scorers/food/foodScorer.js
+// ✅ VERSION PRODUCTION - V3.0 RÉVOLUTIONNAIRE (sans fallback)
 
 const NovaClassifier = require('./novaClassifier');
 const AdditivesAnalyzer = require('./additivesAnalyzer');
@@ -20,123 +18,165 @@ class FoodScorer {
     this.glycemicEstimator = new GlycemicEstimator();
     this.confidenceCalculator = new ConfidenceCalculator();
 
-    this.baseScore = 80;
     this.weights = {
       transformation: 0.35,
-      nutrition: 0.3,
-      glycemic: 0.2,
+      nutrition: 0.30,
+      glycemic: 0.20,
       environmental: 0.15
     };
 
-    console.log('🚀 FoodScorer Hybride V3.0 - Modules IA Sprint 3 activés');
+    this.baseScore = 80;
+    console.log('🚀 FoodScorer V3.0 initialisé - Sprint 3 avec IA Alternatives + Insights');
   }
 
   async analyzeFood(productData, userProfile = {}) {
     try {
-      const { name, ingredients, nutrition, certifications = [], packaging = {} } = productData;
-      console.log(`🔬 Analyse produit: ${name}`);
+      const startTime = Date.now();
 
-      const nova = this.novaClassifier.classify(ingredients);
-      const additives = this.additivesAnalyzer.analyze(ingredients);
-      const nutriScore = this.nutriScorer.calculateNutriScore(nutrition);
-      const glycemic = this.glycemicEstimator.estimateGlycemicIndex({ ingredients, nutrition }, nova);
+      const {
+        name = 'Produit sans nom',
+        ingredients = [],
+        nutrition = {},
+        certifications = [],
+        packaging = {}
+      } = productData;
 
-      const components = {
-        transformation: this.calculateTransformationScore(nova, additives),
-        nutrition: this.calculateNutritionScore(nutriScore),
-        glycemic: this.calculateGlycemicScore(glycemic),
-        environmental: this.calculateEnvironmentalScore(certifications, packaging)
-      };
+      const novaResult = this.novaClassifier.classify(ingredients);
+      const additivesResult = this.additivesAnalyzer.analyze(ingredients);
+      const nutriScoreResult = this.nutriScorer.calculateNutriScore(nutrition);
+      const glycemicResult = this.glycemicEstimator.estimateGlycemicIndex({ ingredients, nutrition }, novaResult);
 
-      const total = this.calculateTotalScore(components);
-      const confidence = this.confidenceCalculator.calculateGlobalConfidence({ nova, additives, nutriScore, glycemic });
+      const scoringResult = this.calculateScore({
+        nova: novaResult,
+        additives: additivesResult,
+        nutriScore: nutriScoreResult,
+        glycemic: glycemicResult,
+        certifications,
+        packaging
+      });
 
       const alternatives = await alternativesEngine.getAlternativesForProduct(productData, userProfile);
       const insights = await insightsGenerator.getInsightsForProduct(productData, userProfile);
 
+      const confidence = this.confidenceCalculator.calculate({
+        nova: novaResult,
+        additives: additivesResult,
+        nutriScore: nutriScoreResult,
+        glycemic: glycemicResult
+      });
+
+      const processingTime = Date.now() - startTime;
+
       return {
-        score: total,
+        score: Math.round(scoringResult.total),
         confidence,
-        breakdown: {
-          transformation: { score: components.transformation, details: { nova, additives } },
-          nutrition: { score: components.nutrition },
-          glycemic: { score: components.glycemic },
-          environmental: { score: components.environmental }
-        },
-        nova_classification: nova,
-        additives_analysis: additives,
-        recommendations: {},
+        grade: this.getScoreGrade(scoringResult.total),
+        improvement: this.getImprovementMessage(scoringResult.total),
+        breakdown: scoringResult.breakdown,
         alternatives,
         insights,
-        chat_context: insights.length > 0 ? { available: true } : { error: 'Analyse limitée' },
+        chat_context: this.generateChatContext(productData, alternatives, insights, scoringResult),
+        recommendations: {},
         differentiation: {},
-        sources: [
-          'INSERM Classification NOVA 2024',
-          'EFSA Additives Database 2024',
-          'ANSES Nutri-Score Algorithm 2024',
-          'International Glycemic Index Table 2024'
-        ],
         meta: {
-          version: '3.0-hybride',
-          timestamp: new Date().toISOString()
+          version: '3.0-final',
+          processing_time_ms: processingTime,
+          sources: [
+            'INSERM Classification NOVA 2024',
+            'EFSA Additives Database 2024',
+            'ANSES Nutri-Score Algorithm 2024',
+            'International Glycemic Index Table 2024',
+            'ECOLOJIA AI Insights & Alternatives'
+          ],
+          calculated_at: new Date().toISOString()
         }
       };
-    } catch (err) {
-      console.error('❌ Erreur analyseFood:', err);
-      return {
-        score: 50,
-        confidence: 0.3,
-        breakdown: {
-          transformation: { score: 50, details: { nova: { group: 1 }, additives: { total: 0 } } },
-          nutrition: { score: 50 },
-          glycemic: { score: 50 },
-          environmental: { score: 50 }
-        },
-        alternatives: [],
-        insights: [],
-        chat_context: { error: 'Analyse limitée' },
-        meta: {
-          version: '3.0-fallback',
-          error: err.message,
-          timestamp: new Date().toISOString()
-        }
-      };
+    } catch (error) {
+      console.error('❌ Erreur dans analyzeFood:', error);
+      throw error;
     }
   }
 
+  calculateScore({ nova, additives, nutriScore, glycemic, certifications, packaging }) {
+    const breakdown = {
+      transformation: this.calculateTransformationScore(nova, additives),
+      nutrition: this.calculateNutritionScore(nutriScore),
+      glycemic: this.calculateGlycemicScore(glycemic),
+      environmental: this.calculateEnvironmentalScore(certifications, packaging)
+    };
+
+    const total =
+      (breakdown.transformation * this.weights.transformation) +
+      (breakdown.nutrition * this.weights.nutrition) +
+      (breakdown.glycemic * this.weights.glycemic) +
+      (breakdown.environmental * this.weights.environmental);
+
+    return {
+      total,
+      breakdown: {
+        transformation: { score: breakdown.transformation, details: { nova, additives } },
+        nutrition: { score: breakdown.nutrition, details: { nutriScore } },
+        glycemic: { score: breakdown.glycemic, details: { glycemic } },
+        environmental: { score: breakdown.environmental, details: { certifications, packaging } }
+      }
+    };
+  }
+
   calculateTransformationScore(nova, additives) {
-    const score = this.baseScore - ((nova.group || 1) * 8) - (additives.total || 0) * 2;
-    return Math.max(0, Math.min(100, score));
+    let score = this.baseScore;
+    const novaPenalty = { 1: 0, 2: -8, 3: -20, 4: -35 }[nova.group] || 0;
+    score += novaPenalty;
+    score -= (additives.microbiomeDisruptors || 0) * 6;
+    score -= (additives.controversial || 0) * 4;
+    score -= Math.min((additives.total || 0), 12);
+    return Math.max(0, score);
   }
 
   calculateNutritionScore(nutriScore) {
-    const impact = { A: 15, B: 8, C: 0, D: -5, E: -12 };
-    return this.baseScore + (impact[nutriScore.grade] || 0);
+    const impact = { A: 18, B: 10, C: 0, D: -8, E: -18 }[nutriScore.grade] || 0;
+    return Math.max(0, Math.min(100, this.baseScore + impact));
   }
 
   calculateGlycemicScore(glycemic) {
-    const index = glycemic.index || 50;
-    let penalty = 0;
-    if (index > 70) penalty = -10;
-    else if (index > 55) penalty = -5;
-    return this.baseScore + penalty;
+    const ig = glycemic.index || 50;
+    const penalty = ig > 70 ? -10 : ig > 55 ? -5 : 0;
+    return Math.max(0, this.baseScore + penalty);
   }
 
   calculateEnvironmentalScore(certifications, packaging) {
-    let score = this.baseScore + certifications.length * 3;
+    let score = this.baseScore;
+    score += Math.min((certifications.length || 0) * 3, 15);
     if (packaging.recyclable === false) score -= 5;
     if (packaging.plastic === true) score -= 3;
     return Math.max(0, Math.min(100, score));
   }
 
-  calculateTotalScore(components) {
-    const w = this.weights;
-    return Math.round(
-      components.transformation * w.transformation +
-      components.nutrition * w.nutrition +
-      components.glycemic * w.glycemic +
-      components.environmental * w.environmental
-    );
+  generateChatContext(productData, alternatives, insights, scoring) {
+    return {
+      product_analyzed: {
+        name: productData.name,
+        score: scoring.total,
+        grade: this.getScoreGrade(scoring.total)
+      },
+      available_alternatives: alternatives.length,
+      available_insights: insights.length
+    };
+  }
+
+  getScoreGrade(score) {
+    if (score >= 85) return 'A';
+    if (score >= 70) return 'B';
+    if (score >= 55) return 'C';
+    if (score >= 40) return 'D';
+    return 'E';
+  }
+
+  getImprovementMessage(score) {
+    if (score >= 85) return 'Excellent produit selon critères scientifiques';
+    if (score >= 70) return 'Bon produit avec quelques améliorations possibles';
+    if (score >= 55) return 'Produit moyen - Plusieurs améliorations recommandées';
+    if (score >= 40) return 'Produit à améliorer - Nombreux critères défavorables';
+    return 'Produit déconseillé - Critères scientifiques très défavorables';
   }
 }
 
