@@ -1,3 +1,5 @@
+// 📁 backend/src/app.js – VERSION COMPLÈTE FINALE
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -27,7 +29,7 @@ const PROD = process.env.NODE_ENV === 'production';
 
 const allowedOrigins = (
   process.env.ALLOWED_ORIGINS ||
-  'https://frontendv3.netlify.app,https://ecolojiafrontv3.netlify.app,https://main--ecolojiafrontv3.netlify.app,https://ecolojia-backend-working.onrender.com,http://localhost:3000,http://localhost:5173,http://localhost:5174'
+  'https://frontendv3.netlify.app,https://ecolojiafrontv3.netlify.app,https://main--ecolojiafrontv3.netlify.app,https://ecolojiabackendv3.onrender.com,http://localhost:3000,http://localhost:5173,http://localhost:4173'
 )
   .split(',')
   .map(o => o.trim());
@@ -51,7 +53,7 @@ app.use(
       'X-Requested-With',
       'Accept',
       'Origin',
-      'x-anonymous-id' // 🔥 requis par frontend
+      'x-anonymous-id' // ✅ CRITIQUE POUR FRONTEND
     ],
   })
 );
@@ -95,14 +97,15 @@ const fallbackProducts = [
 /* -------------------------------------------------------------------------- */
 app.use('/api/analyze', analyzeRoutes);
 
+// 🧪 TEST
 app.get('/api/test-barcode', (_req, res) => {
   res.json({ success: true, message: 'Route barcode test OK', timestamp: Date.now() });
 });
 
+// 📦 PRODUITS
 app.get('/api/products', async (req, res) => {
   try {
     const { limit = 50, offset = 0, q } = req.query;
-
     if (isPostgreSQLConnected()) {
       try {
         const products = await getAllProducts(Number(limit), Number(offset), q?.trim() || null);
@@ -111,7 +114,6 @@ app.get('/api/products', async (req, res) => {
         console.error('PostgreSQL error, fallback', pgErr.message);
       }
     }
-
     let results = [...fallbackProducts];
     if (q) {
       const query = q.toLowerCase();
@@ -129,6 +131,7 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
+// 🔍 SEARCH
 app.get('/api/products/search', async (req, res) => {
   try {
     const { q, limit = 20 } = req.query;
@@ -155,6 +158,7 @@ app.get('/api/products/search', async (req, res) => {
   }
 });
 
+// 🔍 SLUG
 app.get('/api/products/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
@@ -174,6 +178,7 @@ app.get('/api/products/:slug', async (req, res) => {
   }
 });
 
+// 🔍 BARCODE
 app.get('/api/products/barcode/:code', async (req, res) => {
   try {
     const code = req.params.code.replace(/[^\d]/g, '');
@@ -187,20 +192,24 @@ app.get('/api/products/barcode/:code', async (req, res) => {
         console.error('PostgreSQL barcode error', e.message);
       }
     }
+
     const product = fallbackProducts.find(p => p.barcode === code);
     if (product) return res.json({ success: true, product, barcode: code, source: 'fallback' });
+
     res.status(404).json({ success: false, error: 'Produit non trouvé', barcode: code });
   } catch (err) {
     res.status(500).json({ error: 'Erreur barcode', message: err.message });
   }
 });
 
+// 🧪 ANALYSE PHOTOS MOCK
 app.post('/api/products/analyze-photos', (req, res) => {
   const { barcode, photos } = req.body;
   if (!barcode || !photos) return res.status(400).json({ error: 'Barcode et photos requis' });
   res.json({ success: true, message: 'Analyse mock OK', redirect_url: `/product/produit-eco-${Date.now()}` });
 });
 
+// 🏠 ROOT INFO
 app.get('/', async (req, res) => {
   try {
     let count = fallbackProducts.length;
@@ -229,12 +238,15 @@ app.get('/', async (req, res) => {
   }
 });
 
+// ❤️ HEALTH
 app.get(['/health', '/api/health'], (_req, res) => {
   res.json({ status: 'ok', db: isPostgreSQLConnected() ? 'postgresql' : 'fallback', ts: Date.now() });
 });
 
+// 🔚 404
 app.use('*', (req, res) => res.status(404).json({ error: 'Route non trouvée', path: req.originalUrl }));
 
+// 🔌 INIT PG
 console.log('🔌 Initialisation PostgreSQL...');
 testConnection()
   .then(success => {
@@ -243,6 +255,7 @@ testConnection()
   })
   .catch(e => console.error('❌ init error', e.message));
 
+/* ------------------------ Shutdown propre ------------------------ */
 process.on('SIGTERM', async () => {
   console.log('SIGTERM: Closing PG pool...');
   const { pool } = require('./db/pool');
