@@ -33,7 +33,16 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-key', 'x-api-key', 'X-Requested-With', 'Accept', 'Origin']
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'x-cron-key', 
+    'x-api-key', 
+    'X-Requested-With', 
+    'Accept', 
+    'Origin',
+    'x-anonymous-id'  // ✅ FIX CORS - HEADER AJOUTÉ
+  ]
 }));
 
 app.use(helmet({
