@@ -4,8 +4,11 @@ const helmet = require('helmet');
 const dotenv = require('dotenv');
 const visionOCR = require('./services/ocr/visionOCR');
 const analyzeRoutes = require('./routes/analyze.routes');
-const analyzeDevRoutes = require('./routes/analyzeDev.routes'); // ✅ NOUVELLE ROUTE
+const analyzeDevRoutes = require('./routes/analyzeDev.routes');
 const chatRoutes = require('./routes/chat.routes');
+
+// ➕ NOUVEAU : Import du système quota
+const userRoutes = require('./routes/user.routes');
 
 dotenv.config();
 
@@ -41,7 +44,7 @@ app.use(cors({
     'X-Requested-With', 
     'Accept', 
     'Origin',
-    'x-anonymous-id'  // ✅ FIX CORS - HEADER AJOUTÉ
+    'x-anonymous-id'
   ]
 }));
 
@@ -52,10 +55,24 @@ app.use(helmet({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// --- ROUTES PRODUITS --- //
+// ==============================
+// ➕ NOUVEAU : INTÉGRATION SYSTÈME QUOTA
+// ==============================
+
+// Import des middlewares quota depuis user.routes.js
+const { checkAnalysisQuota, checkChatQuota } = require('./routes/user.routes');
+
+// Routes utilisateur (quota)
+app.use('/api/user', userRoutes);
+
+// ==============================
+// 🔄 ROUTES PRODUITS AVEC QUOTA
+// ==============================
+
 const productRoutes = express.Router();
 
-productRoutes.post('/analyze-photos', async (req, res) => {
+// ➕ MODIFIÉ : Analyse photos avec vérification quota
+productRoutes.post('/analyze-photos', checkAnalysisQuota, async (req, res) => {
   try {
     const { barcode, photos } = req.body;
 
@@ -88,7 +105,7 @@ productRoutes.post('/analyze-photos', async (req, res) => {
   }
 });
 
-// --- FAKE ROUTES PRODUITS TEMPORAIRES --- //
+// Routes produits existantes (sans quota)
 productRoutes.get('/', (req, res) => {
   res.json([
     {
@@ -156,29 +173,92 @@ productRoutes.get('/:slug', (req, res) => {
   res.json(mockProduct);
 });
 
-// --- ROUTES SYSTÈME --- //
-const healthRoutes = express.Router();
-healthRoutes.get('/health', (req, res) => {
+// ==============================
+// 🔄 ROUTES ANALYSE AVEC QUOTA - VERSION SIMPLIFIÉE
+// ==============================
+
+// Wrapper simple pour ajouter le middleware quota
+const addQuotaToAnalyzeRoutes = (router) => {
+  const express = require('express');
+  const newRouter = express.Router();
+  
+  // Copier toutes les routes en ajoutant le middleware quota aux POST
+  router.stack.forEach(layer => {
+    if (layer.route) {
+      const { path, methods } = layer.route;
+      
+      if (methods.post) {
+        // Ajouter middleware quota pour les routes POST
+        newRouter.post(path, checkAnalysisQuota, ...layer.route.stack.map(s => s.handle));
+      } else {
+        // Copier les autres méthodes sans modification
+        Object.keys(methods).forEach(method => {
+          if (method !== 'post') {
+            newRouter[method](path, ...layer.route.stack.map(s => s.handle));
+          }
+        });
+      }
+    }
+  });
+  
+  return newRouter;
+};
+
+// ==============================
+// 📡 ROUTES PRINCIPALES
+// ==============================
+
+app.use('/api/products', productRoutes);
+
+// ➕ MODIFIÉ : Routes d'analyse avec quota
+app.use('/api/analyze', addQuotaToAnalyzeRoutes(analyzeRoutes));
+app.use('/api/analyze', addQuotaToAnalyzeRoutes(analyzeDevRoutes));
+
+// ➕ MODIFIÉ : Routes chat avec quota
+const addQuotaToChatRoutes = (router) => {
+  const express = require('express');
+  const newRouter = express.Router();
+  
+  router.stack.forEach(layer => {
+    if (layer.route) {
+      const { path, methods } = layer.route;
+      
+      if (methods.post) {
+        newRouter.post(path, checkChatQuota, ...layer.route.stack.map(s => s.handle));
+      } else {
+        Object.keys(methods).forEach(method => {
+          if (method !== 'post') {
+            newRouter[method](path, ...layer.route.stack.map(s => s.handle));
+          }
+        });
+      }
+    }
+  });
+  
+  return newRouter;
+};
+
+app.use('/api/chat', addQuotaToChatRoutes(chatRoutes));
+
+// ==============================
+// 🏥 ROUTES SYSTÈME
+// ==============================
+
+app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
     mode: 'ocr-intelligent',
     nova_scoring: 'active',
-    efsa_additives: 'active'
+    efsa_additives: 'active',
+    quota_system: 'active' // ➕ NOUVEAU
   });
 });
 
-app.use('/api/products', productRoutes);
-app.use('/api', healthRoutes);
-app.use('/api/analyze', analyzeRoutes);
-app.use('/api/analyze', analyzeDevRoutes); // ✅ NOUVELLE ROUTE TEST DEBUG
-app.use('/api/chat', chatRoutes);
-
-// --- ROUTE ROOT --- //
 app.get('/', (req, res) => {
   res.json({
     message: 'Ecolojia API - Assistant IA Scientifique Révolutionnaire',
-    version: '3.0.0-sprint3-ia',
+    version: '3.1.0-quota-integrated', // ➕ VERSION MISE À JOUR
     environment: process.env.NODE_ENV || 'production',
     timestamp: new Date().toISOString(),
     features: {
@@ -187,26 +267,47 @@ app.get('/', (req, res) => {
       'Additifs EFSA': 'active',
       'IA Alternatives': 'active',
       'IA Insights': 'active',
-      'Chat IA': 'active'
+      'Chat IA': 'active',
+      'Système Quota': 'active' // ➕ NOUVEAU
     },
     endpoints: {
-      'POST /api/products/analyze-photos': 'OCR IA Google Vision',
-      'POST /api/analyze/food': 'Scoring complet avec seuil de confiance',
-      'POST /api/analyze/dev': 'Scoring sans blocage confiance faible',
-      'GET /api/analyze/health': 'Status scoring scientifique',
-      'POST /api/chat/message': 'Chat IA conversationnel',
-      'POST /api/chat/quick/:questionType': 'Réponses rapides IA',
+      'POST /api/products/analyze-photos': 'OCR IA Google Vision (avec quota)',
+      'POST /api/analyze/food': 'Scoring complet (avec quota)',
+      'POST /api/analyze/dev': 'Scoring dev (avec quota)',
+      'GET /api/analyze/health': 'Status scoring',
+      'POST /api/chat/message': 'Chat IA (avec quota)',
+      'POST /api/chat/quick/:questionType': 'Réponses rapides (avec quota)',
       'GET /api/chat/suggestions/:category': 'Suggestions questions',
-      'POST /api/chat/context/alternatives': 'Alternatives IA',
-      'POST /api/chat/context/insights': 'Insights IA',
-      'GET /api/chat/health': 'Health check chat IA'
+      'POST /api/chat/context/alternatives': 'Alternatives IA (avec quota)',
+      'POST /api/chat/context/insights': 'Insights IA (avec quota)',
+      'GET /api/chat/health': 'Health check chat',
+      'GET /api/user/quota': 'Vérification quota utilisateur', // ➕ NOUVEAU
+      'GET /api/user/quota/debug': 'Debug quota (développement)' // ➕ NOUVEAU
+    },
+    quota: { // ➕ NOUVEAU
+      daily_limit_analyses: 10,
+      daily_limit_chat: 50,
+      reset_time: '00:00:00 UTC'
     }
   });
 });
 
-// --- GESTION DES ERREURS --- //
+// ==============================
+// 🚨 GESTION DES ERREURS
+// ==============================
+
 app.use((error, req, res, next) => {
   console.error('❌ Erreur serveur:', error);
+  
+  // Gestion spéciale erreurs quota
+  if (error.message.includes('QUOTA_EXCEEDED')) {
+    return res.status(429).json({
+      error: 'Quota quotidien épuisé',
+      message: error.message,
+      retry_after: '24h'
+    });
+  }
+  
   res.status(500).json({
     error: 'Erreur serveur interne',
     message: error.message
@@ -218,6 +319,7 @@ app.use((req, res) => {
     error: 'Route non trouvée',
     requested: req.originalUrl,
     available_endpoints: [
+      'GET /api/user/quota', // ➕ NOUVEAU en premier
       'POST /api/products/analyze-photos',
       'POST /api/analyze/food',
       'POST /api/analyze/dev',
@@ -228,10 +330,15 @@ app.use((req, res) => {
       'POST /api/chat/context/alternatives',
       'POST /api/chat/context/insights',
       'GET /api/chat/health',
-      'GET /api/products'
+      'GET /api/products',
+      'GET /health'
     ]
   });
 });
+
+// ==============================
+// 🚀 DÉMARRAGE SERVEUR
+// ==============================
 
 app.listen(PORT, HOST, () => {
   console.log(`🌱 Serveur Ecolojia (IA Assistant Révolutionnaire) sur http://${HOST}:${PORT}`);
@@ -242,4 +349,9 @@ app.listen(PORT, HOST, () => {
   console.log(`💡 Alternatives automatiques ACTIVES`);
   console.log(`📚 Insights scientifiques ACTIFS`);
   console.log(`💬 Chat IA conversationnel ACTIF`);
+  console.log(`📊 Système de quota INTÉGRÉ`); // ➕ NOUVEAU
+  console.log(`⚡ Limites quotidiennes :`);
+  console.log(`   🔬 Analyses : 10/jour par utilisateur`);
+  console.log(`   💬 Messages chat : 50/jour par utilisateur`);
+  console.log(`✅ Endpoint /api/user/quota DISPONIBLE`); // ➕ NOUVEAU
 });
