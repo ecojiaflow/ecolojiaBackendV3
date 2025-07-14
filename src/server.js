@@ -6,8 +6,6 @@ const visionOCR = require('./services/ocr/visionOCR');
 const analyzeRoutes = require('./routes/analyze.routes');
 const analyzeDevRoutes = require('./routes/analyzeDev.routes');
 const chatRoutes = require('./routes/chat.routes');
-
-// ➕ NOUVEAU : Import du système quota
 const userRoutes = require('./routes/user.routes');
 
 dotenv.config();
@@ -37,12 +35,12 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
-    'x-cron-key', 
-    'x-api-key', 
-    'X-Requested-With', 
-    'Accept', 
+    'Content-Type',
+    'Authorization',
+    'x-cron-key',
+    'x-api-key',
+    'X-Requested-With',
+    'Accept',
     'Origin',
     'x-anonymous-id'
   ]
@@ -55,10 +53,6 @@ app.use(helmet({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// ==============================
-// ✅ ROUTES MULTI-CATÉGORIES
-// ==============================
-
 try {
   const multiCategoryRoutes = require('./routes/multiCategory.routes');
   app.use('/api/multi-category', multiCategoryRoutes);
@@ -67,16 +61,8 @@ try {
   console.warn('⚠️ multiCategory.routes.js non disponible :', err.message);
 }
 
-// ==============================
-// ➕ ROUTES QUOTA UTILISATEUR
-// ==============================
-
 const { checkAnalysisQuota, checkChatQuota } = require('./routes/user.routes');
 app.use('/api/user', userRoutes);
-
-// ==============================
-// 🔄 ROUTES PRODUITS (OCR, GET)
-// ==============================
 
 const productRoutes = express.Router();
 
@@ -114,32 +100,25 @@ productRoutes.post('/analyze-photos', checkAnalysisQuota, async (req, res) => {
 });
 
 productRoutes.get('/', (req, res) => {
-  res.json([
-    {
-      id: "fallback_1",
-      title: "Produit Éco Fallback",
-      slug: "produit-eco-fallback",
-      description: "Service en mode fallback",
-      brand: "EcoFallback",
-      category: "test",
-      eco_score: 0.75,
-      confidence_pct: 100,
-      verified_status: "fallback",
-      tags: ["fallback"],
-      zones_dispo: ["FR"],
-      image_url: null,
-      prices: { default: 0 }
-    }
-  ]);
+  res.json([{
+    id: "fallback_1",
+    title: "Produit Éco Fallback",
+    slug: "produit-eco-fallback",
+    description: "Service en mode fallback",
+    brand: "EcoFallback",
+    category: "test",
+    eco_score: 0.75,
+    confidence_pct: 100,
+    verified_status: "fallback",
+    tags: ["fallback"],
+    zones_dispo: ["FR"],
+    image_url: null,
+    prices: { default: 0 }
+  }]);
 });
 
 productRoutes.get('/search', (req, res) => {
-  res.json({ 
-    products: [], 
-    count: 0, 
-    query: req.query.q || '',
-    source: 'fallback'
-  });
+  res.json({ products: [], count: 0, query: req.query.q || '', source: 'fallback' });
 });
 
 productRoutes.get('/barcode/:code', (req, res) => {
@@ -155,7 +134,6 @@ productRoutes.get('/barcode/:code', (req, res) => {
 
 productRoutes.get('/:slug', (req, res) => {
   const { slug } = req.params;
-
   const mockProduct = {
     id: "fallback_" + Date.now(),
     title: "Produit Éco Analysé (Fallback)",
@@ -175,14 +153,9 @@ productRoutes.get('/:slug', (req, res) => {
     resume_fr: "Produit analysé via OCR IA (beta)",
     enriched_at: new Date().toISOString()
   };
-
   console.log(`✅ Retour produit mock pour slug: ${slug}`);
   res.json(mockProduct);
 });
-
-// ==============================
-// 🔄 ROUTES ANALYSE + CHAT QUOTA
-// ==============================
 
 const addQuotaToAnalyzeRoutes = (router) => {
   const express = require('express');
@@ -224,28 +197,13 @@ const addQuotaToChatRoutes = (router) => {
   return newRouter;
 };
 
-// ==============================
-// 📡 ROUTES API
-// ==============================
-
 app.use('/api/products', productRoutes);
 app.use('/api/analyze', addQuotaToAnalyzeRoutes(analyzeRoutes));
 app.use('/api/analyze', addQuotaToAnalyzeRoutes(analyzeDevRoutes));
 app.use('/api/chat', addQuotaToChatRoutes(chatRoutes));
 
-// ==============================
-// 🏥 SANTÉ DU SYSTÈME
-// ==============================
-
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    mode: 'ocr-intelligent',
-    nova_scoring: 'active',
-    efsa_additives: 'active',
-    quota_system: 'active'
-  });
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 app.get('/', (req, res) => {
@@ -257,10 +215,6 @@ app.get('/', (req, res) => {
   });
 });
 
-// ==============================
-// 🚨 GESTION DES ERREURS
-// ==============================
-
 app.use((error, req, res, next) => {
   console.error('❌ Erreur serveur:', error);
   if (error.message.includes('QUOTA_EXCEEDED')) {
@@ -270,37 +224,15 @@ app.use((error, req, res, next) => {
       retry_after: '24h'
     });
   }
-  res.status(500).json({
-    error: 'Erreur serveur interne',
-    message: error.message
-  });
+  res.status(500).json({ error: 'Erreur serveur interne', message: error.message });
 });
 
 app.use((req, res) => {
   res.status(404).json({
     error: 'Route non trouvée',
-    requested: req.originalUrl,
-    available_endpoints: [
-      'GET /api/user/quota',
-      'POST /api/products/analyze-photos',
-      'POST /api/analyze/food',
-      'POST /api/analyze/dev',
-      'GET /api/analyze/health',
-      'POST /api/chat/message',
-      'POST /api/chat/quick/:questionType',
-      'GET /api/chat/suggestions/:category',
-      'POST /api/chat/context/alternatives',
-      'POST /api/chat/context/insights',
-      'GET /api/chat/health',
-      'GET /api/products',
-      'GET /health'
-    ]
+    requested: req.originalUrl
   });
 });
-
-// ==============================
-// 🚀 LANCEMENT SERVEUR
-// ==============================
 
 app.listen(PORT, HOST, () => {
   console.log(`🌱 Serveur Ecolojia (IA Assistant Révolutionnaire) sur http://${HOST}:${PORT}`);
