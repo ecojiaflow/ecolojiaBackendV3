@@ -1,4 +1,4 @@
-// 📁 backend/src/app.js – VERSION COMPLÈTE FINALE
+// 📁 backend/src/app.js – VERSION COMPLÈTE MULTI-CATÉGORIES
 
 const express = require('express');
 const cors = require('cors');
@@ -21,6 +21,40 @@ const {
 } = require('./db/pool');
 
 const analyzeRoutes = require('./routes/analyze.routes');
+
+// 🆕 IMPORT MULTI-CATÉGORIES (avec fallback)
+let multiCategoryRoutes;
+try {
+  multiCategoryRoutes = require('./routes/multiCategory.routes');
+  console.log('✅ Routes multi-catégories chargées');
+} catch (error) {
+  console.warn('⚠️ Routes multi-catégories non disponibles:', error.message);
+  // Route fallback minimale
+  multiCategoryRoutes = require('express').Router();
+  multiCategoryRoutes.post('/analyze', (req, res) => {
+    res.json({
+      success: true,
+      category: 'food',
+      analysis: { overall_score: 50 },
+      alternatives: [],
+      message: 'Service multi-catégories en cours de déploiement'
+    });
+  });
+  multiCategoryRoutes.get('/categories', (req, res) => {
+    res.json({
+      success: true,
+      categories: [
+        { id: 'food', name: 'Alimentaire', available: true },
+        { id: 'cosmetics', name: 'Cosmétiques', available: false },
+        { id: 'detergents', name: 'Détergents', available: false }
+      ],
+      message: 'Service multi-catégories en déploiement'
+    });
+  });
+  multiCategoryRoutes.get('/health', (req, res) => {
+    res.json({ status: 'fallback', service: 'MultiCategory Fallback' });
+  });
+}
 
 /* -------------------------------------------------------------------------- */
 /*                              CONFIG CORS                                   */
@@ -53,7 +87,8 @@ app.use(
       'X-Requested-With',
       'Accept',
       'Origin',
-      'x-anonymous-id' // ✅ CRITIQUE POUR FRONTEND
+      'x-anonymous-id',
+      'x-user-id'
     ],
   })
 );
@@ -95,7 +130,66 @@ const fallbackProducts = [
 /* -------------------------------------------------------------------------- */
 /*                              ROUTES API                                    */
 /* -------------------------------------------------------------------------- */
+
+// 🆕 ROUTES MULTI-CATÉGORIES (NOUVEAU)
+app.use('/api/multi-category', multiCategoryRoutes);
+
+// 🔄 ROUTES EXISTANTES
 app.use('/api/analyze', analyzeRoutes);
+
+// 🆕 ANALYSE V3 COMPATIBLE (pont entre ancien et nouveau système)
+app.post('/api/analyze-v3', async (req, res) => {
+  try {
+    const { product, context = {} } = req.body;
+    
+    // Tentative d'utilisation du nouveau service multi-catégories
+    try {
+      const MultiCategoryRouter = require('./services/ai/multiCategoryRouter');
+      const multiService = new MultiCategoryRouter();
+      
+      const result = await multiService.analyzeProduct(product, {
+        ...context,
+        userId: req.headers['x-anonymous-id'] || req.headers['x-user-id'] || req.ip,
+        startTime: Date.now()
+      });
+      
+      return res.json({
+        ...result,
+        api_version: '3.0-multi',
+        legacy_compatible: true,
+        migration_note: 'Utilisez /api/multi-category/analyze pour la version native'
+      });
+      
+    } catch (multiError) {
+      console.warn('Service multi-catégories échoué, fallback vers analyze classique:', multiError.message);
+    }
+    
+    // Fallback vers service analyze existant
+    return res.json({
+      success: true,
+      category: 'food',
+      analysis: {
+        overall_score: 65,
+        confidence: 0.7,
+        message: 'Analyse de base - service complet en déploiement'
+      },
+      alternatives: [],
+      metadata: {
+        api_version: '1.0-fallback',
+        processing_time_ms: 100,
+        fallback_reason: 'Multi-category service unavailable'
+      }
+    });
+    
+  } catch (error) {
+    console.error('Erreur analyze-v3:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      fallback_available: true
+    });
+  }
+});
 
 // 🧪 TEST
 app.get('/api/test-barcode', (_req, res) => {
@@ -209,12 +303,15 @@ app.post('/api/products/analyze-photos', (req, res) => {
   res.json({ success: true, message: 'Analyse mock OK', redirect_url: `/product/produit-eco-${Date.now()}` });
 });
 
-// 🏠 ROOT INFO
+// 🏠 ROOT INFO (VERSION ÉTENDUE)
 app.get('/', async (req, res) => {
   try {
     let count = fallbackProducts.length;
     let statusDB = 'Fallback only';
+    let multiCategoryStatus = 'Non disponible';
+    let availableCategories = [];
 
+    // Test base de données existante
     if (isPostgreSQLConnected()) {
       try {
         const { pool } = require('./db/pool');
@@ -226,11 +323,39 @@ app.get('/', async (req, res) => {
       }
     }
 
+    // Test service multi-catégories
+    try {
+      const MultiCategoryRouter = require('./services/ai/multiCategoryRouter');
+      const multiService = new MultiCategoryRouter();
+      const healthCheck = await multiService.healthCheck();
+      multiCategoryStatus = healthCheck.status || 'Disponible';
+      availableCategories = healthCheck.available_categories || [];
+    } catch (err) {
+      multiCategoryStatus = 'Service non initialisé';
+      availableCategories = ['food']; // Fallback
+    }
+
     res.json({
-      message: 'Ecolojia API',
-      version: '1.2.0',
+      message: 'Ecolojia API Multi-Catégories',
+      version: '1.3.0-multi',
       products_count: count,
       database: statusDB,
+      multi_category_service: multiCategoryStatus,
+      available_categories: availableCategories,
+      available_endpoints: [
+        'GET /api/products - Liste produits',
+        'POST /api/analyze - Analyse v1 (alimentaire)',
+        'POST /api/analyze-v3 - Analyse v3 (compatible)',
+        'POST /api/multi-category/analyze - Analyse multi-catégories native',
+        'GET /api/multi-category/categories - Liste catégories',
+        'GET /api/multi-category/health - Santé service multi-catégories',
+        'GET /api/health - Santé système global'
+      ],
+      deployment: {
+        environment: process.env.NODE_ENV || 'development',
+        node_version: process.version,
+        uptime_seconds: process.uptime()
+      },
       ts: Date.now(),
     });
   } catch (err) {
@@ -238,29 +363,136 @@ app.get('/', async (req, res) => {
   }
 });
 
-// ❤️ HEALTH
-app.get(['/health', '/api/health'], (_req, res) => {
-  res.json({ status: 'ok', db: isPostgreSQLConnected() ? 'postgresql' : 'fallback', ts: Date.now() });
+// ❤️ HEALTH (VERSION ÉTENDUE)
+app.get(['/health', '/api/health'], async (req, res) => {
+  const health = {
+    status: 'ok',
+    database: isPostgreSQLConnected() ? 'postgresql' : 'fallback',
+    multi_category: 'unknown',
+    services: {},
+    timestamp: Date.now(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage()
+  };
+
+  // Test santé service multi-catégories
+  try {
+    const MultiCategoryRouter = require('./services/ai/multiCategoryRouter');
+    const multiService = new MultiCategoryRouter();
+    const multiHealth = await multiService.healthCheck();
+    
+    health.multi_category = multiHealth.status;
+    health.services.multi_category = {
+      status: multiHealth.status,
+      available_categories: multiHealth.available_categories || [],
+      analyzers_count: multiHealth.analyzers_count || 0,
+      last_check: multiHealth.last_check
+    };
+    
+  } catch (error) {
+    health.multi_category = 'error';
+    health.services.multi_category = {
+      status: 'error',
+      error: error.message,
+      fallback_active: true
+    };
+  }
+
+  // Test autres services
+  health.services.database = {
+    status: health.database,
+    connected: isPostgreSQLConnected()
+  };
+
+  // Statut global
+  const isHealthy = health.status === 'ok' && 
+                   health.database !== 'error' && 
+                   health.multi_category !== 'error';
+
+  health.overall_status = isHealthy ? 'healthy' : 'degraded';
+
+  res.status(isHealthy ? 200 : 503).json(health);
 });
 
 // 🔚 404
-app.use('*', (req, res) => res.status(404).json({ error: 'Route non trouvée', path: req.originalUrl }));
+app.use('*', (req, res) => res.status(404).json({ 
+  error: 'Route non trouvée', 
+  path: req.originalUrl,
+  available_routes: [
+    '/api/products',
+    '/api/analyze',
+    '/api/multi-category/*',
+    '/health'
+  ]
+}));
 
-// 🔌 INIT PG
+/* -------------------------------------------------------------------------- */
+/*                            INITIALISATION                                  */
+/* -------------------------------------------------------------------------- */
+
+// 🔌 INIT POSTGRESQL
 console.log('🔌 Initialisation PostgreSQL...');
 testConnection()
   .then(success => {
     if (success) console.log('✅ Base PostgreSQL connectée');
     else console.log('⚠️ PostgreSQL indisponible – Fallback activé');
   })
-  .catch(e => console.error('❌ init error', e.message));
+  .catch(e => console.error('❌ PostgreSQL init error', e.message));
+
+// 🆕 INIT MULTI-CATÉGORIES
+console.log('🔌 Initialisation services multi-catégories...');
+try {
+  const MultiCategoryRouter = require('./services/ai/multiCategoryRouter');
+  const multiService = new MultiCategoryRouter();
+  multiService.healthCheck()
+    .then(health => {
+      console.log(`✅ Service multi-catégories initialisé`);
+      console.log(`📊 Statut: ${health.status}`);
+      console.log(`🔧 Analyseurs: ${health.analyzers_count || 0}`);
+      console.log(`📂 Catégories: ${health.available_categories?.join(', ') || 'aucune'}`);
+    })
+    .catch(err => {
+      console.log('⚠️ Service multi-catégories partiellement disponible:', err.message);
+      console.log('📋 Mode fallback activé - fonctionnalités de base disponibles');
+    });
+} catch (error) {
+  console.log('⚠️ Service multi-catégories non disponible');
+  console.log('📋 Analyse alimentaire classique maintenue');
+  console.log('🔄 Les services multi-catégories seront disponibles après déploiement complet');
+}
 
 /* ------------------------ Shutdown propre ------------------------ */
 process.on('SIGTERM', async () => {
-  console.log('SIGTERM: Closing PG pool...');
-  const { pool } = require('./db/pool');
-  if (pool) await pool.end();
+  console.log('SIGTERM: Closing connections...');
+  
+  // Fermeture pool PostgreSQL
+  try {
+    const { pool } = require('./db/pool');
+    if (pool) await pool.end();
+    console.log('✅ PostgreSQL pool fermé');
+  } catch (e) {
+    console.warn('⚠️ Erreur fermeture PostgreSQL:', e.message);
+  }
+  
+  console.log('👋 Arrêt propre du serveur');
   process.exit(0);
+});
+
+// Gestion erreurs non capturées
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Ne pas fermer le processus en production
+  if (process.env.NODE_ENV !== 'production') {
+    process.exit(1);
+  }
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // Ne pas fermer le processus en production
+  if (process.env.NODE_ENV !== 'production') {
+    process.exit(1);
+  }
 });
 
 module.exports = app;
