@@ -1,4 +1,3 @@
-"use strict";
 // src/services/ai/productTypeDetector.js
 /**
  * 🔍 ECOLOJIA ProductTypeDetector v1.0

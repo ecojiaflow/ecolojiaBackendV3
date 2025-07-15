@@ -1,4 +1,3 @@
-"use strict";
 // backend/src/services/ai/alternativesEngine.js
 /**
  * 🌱 ECOLOJIA - Moteur d'Alternatives Naturelles

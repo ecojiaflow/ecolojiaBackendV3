@@ -1,4 +1,3 @@
-"use strict";
 const axios = require('axios');
 const alternativesEngine = require('./alternativesEngine');
 const insightsGenerator = require('./insightsGenerator');

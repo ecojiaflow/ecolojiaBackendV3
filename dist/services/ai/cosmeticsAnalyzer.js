@@ -1,4 +1,3 @@
-"use strict";
 // backend/src/services/ai/cosmeticsAnalyzer.js
 // Analyseur spécialisé pour produits cosmétiques
 class CosmeticsAnalyzer {

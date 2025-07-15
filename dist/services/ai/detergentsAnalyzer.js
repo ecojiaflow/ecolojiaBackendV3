@@ -1,4 +1,3 @@
-"use strict";
 // backend/src/services/ai/detergentsAnalyzer.js
 // Analyseur spécialisé pour produits détergents
 class DetergentsAnalyzer {

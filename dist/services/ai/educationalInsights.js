@@ -1,4 +1,3 @@
-"use strict";
 // backend/src/services/ai/educationalInsights.js
 /**
  * 📚 ECOLOJIA - Moteur d'Insights Éducatifs Scientifiques

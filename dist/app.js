@@ -1,37 +1,22 @@
 "use strict";
-// PATH: src/app.ts
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+// PATH: backend/src/app.ts
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
-const helmet_1 = __importDefault(require("helmet"));
-const dotenv_1 = __importDefault(require("dotenv"));
-dotenv_1.default.config();
-const app = (0, express_1.default)();
-/* --------------------------- Middleware de sécurité -------------------------- */
-app.use((0, cors_1.default)());
-app.use((0, helmet_1.default)({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(express_1.default.json({ limit: '10mb' }));
-app.use(express_1.default.urlencoded({ extended: true }));
-/* ------------------------------ Import des routes ----------------------------- */
+const body_parser_1 = __importDefault(require("body-parser"));
+const health_routes_1 = __importDefault(require("./routes/health.routes"));
+const chat_routes_1 = __importDefault(require("./routes/chat.routes"));
 const multiCategory_routes_1 = __importDefault(require("./routes/multiCategory.routes"));
+const ultraProcessing_routes_1 = __importDefault(require("./routes/ultraProcessing.routes")); // ✅ IMPORT AJOUTÉ
+const app = (0, express_1.default)();
+app.use((0, cors_1.default)());
+app.use(body_parser_1.default.json());
+app.use('/api/health', health_routes_1.default);
+app.use('/api/chat', chat_routes_1.default);
 app.use('/api/multi-category', multiCategory_routes_1.default);
-/* ------------------------------- Routes système ------------------------------- */
-app.get('/api/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        message: 'Ecolojia backend alive',
-        timestamp: Date.now()
-    });
-});
-app.get('/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        message: 'Ecolojia backend alive',
-        timestamp: Date.now()
-    });
-});
+app.use('/api/ultra-processing', ultraProcessing_routes_1.default); // ✅ ROUTE AJOUTÉE
 exports.default = app;
 // EOF
