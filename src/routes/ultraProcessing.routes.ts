@@ -20,7 +20,7 @@ const suspiciousKeywords = [
 ];
 
 // 🔬 Analyse IA ultra-transformation
-const detectUltraTransformation = (ingredients: string[]): {
+export const detectUltraTransformation = (ingredients: string[]): {
   level: 'léger' | 'modéré' | 'sévère';
   score: number;
   detected: string[];
@@ -28,13 +28,13 @@ const detectUltraTransformation = (ingredients: string[]): {
 } => {
   const found: string[] = [];
 
-  ingredients.forEach((ing) => {
-    suspiciousKeywords.forEach((keyword) => {
+  for (const ing of ingredients) {
+    for (const keyword of suspiciousKeywords) {
       if (ing.toLowerCase().includes(keyword)) {
         found.push(keyword);
       }
-    });
-  });
+    }
+  }
 
   const uniqueFound = [...new Set(found)];
 
