@@ -5,8 +5,8 @@
   "description": "API backend for Ecolojia - Node.js + Express + Prisma",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "build": "tsc -p ./tsconfig.json",
+    "dev": "node dist/server.js",
+    "build": "echo 'Using pre-compiled dist/ folder - no TypeScript compilation needed'",
     "start": "node dist/server.js",
     "test": "jest",
     "test:watch": "jest --watch",
