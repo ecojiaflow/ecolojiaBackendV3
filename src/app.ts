@@ -6,7 +6,7 @@ import bodyParser from 'body-parser';
 import healthRoutes from './routes/health.routes';
 import chatRoutes from './routes/chat.routes';
 import multiCategoryRoutes from './routes/multiCategory.routes';
-import ultraProcessingRoutes from './routes/ultraProcessing.routes'; // 👈 AJOUT
+import ultraProcessingRoutes from './routes/ultraProcessing.routes'; // ✅ IMPORT AJOUTÉ
 
 const app = express();
 
@@ -16,7 +16,7 @@ app.use(bodyParser.json());
 app.use('/api/health', healthRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/multi-category', multiCategoryRoutes);
-app.use('/api/ultra-processing', ultraProcessingRoutes); // 👈 AJOUT
+app.use('/api/ultra-processing', ultraProcessingRoutes); // ✅ ROUTE AJOUTÉE
 
 export default app;
 // EOF
