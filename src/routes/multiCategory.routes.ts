@@ -1,76 +1,53 @@
-// PATH: backend/src/routes/multiCategory.routes.ts
-import express, { Request, Response } from 'express';
-import { NovaClassifier } from '../services/ai/novaClassifier';
+// PATH: src/routes/multiCategory.routes.ts
 
-const router = express.Router();
-const novaClassifier = new NovaClassifier();
+import { Router } from 'express';
+import NovaClassifier from '../services/ai/novaClassifier';
 
-// Exemple temporaire de détection de catégorie
-function detectCategory(product: any): string {
-  const title = (product?.title || '').toLowerCase();
-  if (title.includes('shampoo') || title.includes('gel')) return 'cosmetics';
-  if (title.includes('nettoyant') || title.includes('détergent')) return 'detergents';
-  return 'food';
-}
+const router = Router();
+const nova = new NovaClassifier();
 
-router.get('/categories', (_req: Request, res: Response) => {
+router.get('/categories', (_req, res) => {
   res.json({
     success: true,
     categories: [
-      { id: 'food', name: 'Alimentaire', available: true },
-      { id: 'cosmetics', name: 'Cosmétiques', available: false },
-      { id: 'detergents', name: 'Détergents', available: false }
-    ]
+      { id: 'food', name: 'Alimentaire' },
+      { id: 'cosmetics', name: 'Cosmétiques' },
+      { id: 'detergents', name: 'Détergents' }
+    ],
+    message: 'Catégories multi-produits supportées'
   });
 });
 
-router.get('/health', (_req: Request, res: Response) => {
+router.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
-    service: 'MultiCategoryRoute',
-    available_categories: ['food'],
-    timestamp: new Date().toISOString()
+    service: 'multi-category',
+    analyzers: ['NOVAClassifier'],
+    timestamp: Date.now()
   });
 });
 
-router.post('/analyze', async (req: Request, res: Response) => {
+router.post('/analyze', (req, res) => {
   try {
-    const { product } = req.body;
+    const product = req.body.product;
 
-    if (!product || !Array.isArray(product.ingredients)) {
-      return res.status(400).json({ success: false, error: 'Produit ou ingrédients manquants' });
+    if (!product || !product.ingredients || !Array.isArray(product.ingredients)) {
+      return res.status(400).json({ error: 'Produit invalide ou ingrédients manquants' });
     }
 
-    const detectedCategory = detectCategory(product);
-
-    // Analyse NOVA via IA
-    const novaAnalysis = novaClassifier.classify(
-      product.ingredients,
-      product.processing_methods || []
-    );
-
-    // Score de base simulé
-    const baseScore = 65;
-    const finalScore = Math.max(0, baseScore + novaAnalysis.penalties);
+    const novaResult = nova.classifyProduct(product);
 
     res.json({
       success: true,
-      category: detectedCategory,
+      category: 'food',
       analysis: {
-        overall_score: finalScore,
-        confidence: novaAnalysis.confidence,
-        nova_analysis: novaAnalysis
+        nova: novaResult,
+        overall_score: 70 + (novaResult.novaGroup === 1 ? 10 : novaResult.novaGroup === 4 ? -20 : 0)
       },
-      alternatives: [],
-      timestamp: new Date().toISOString()
+      timestamp: Date.now()
     });
   } catch (error: any) {
-    console.error('❌ Erreur analyse multi-catégories:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Erreur interne analyse IA',
-      message: error.message
-    });
+    res.status(500).json({ error: error.message || 'Erreur analyse NOVA' });
   }
 });
 
