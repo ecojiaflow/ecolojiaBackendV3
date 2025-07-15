@@ -1,13 +1,14 @@
+// PATH: backend/package.json
 {
   "name": "ecolojia-backend",
   "version": "0.1.0",
   "private": true,
   "description": "API backend for Ecolojia - Node.js + Express + Prisma",
-  "main": "src/server.js",
+  "main": "src/server.ts",
   "scripts": {
-    "dev": "node src/server.js",
-    "build": "prisma generate",
-    "start": "node src/server.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc -p ./tsconfig.json",
+    "start": "node dist/server.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:sprint3": "jest tests/sprint3-validation.test.js --verbose --detectOpenHandles",
@@ -51,9 +52,15 @@
     "zod": "^3.25.64"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
     "@types/jest": "^29.5.14",
+    "@types/node": "^24.0.14",
     "jest": "^29.7.0",
-    "supertest": "^6.3.4"
+    "supertest": "^6.3.4",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.8.3"
   },
   "jest": {
     "testEnvironment": "node",
@@ -74,3 +81,4 @@
     "forceExit": true
   }
 }
+// EOF

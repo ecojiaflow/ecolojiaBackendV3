@@ -12,7 +12,6 @@ model Product {
   title            String
   description      String           @default("")
   slug             String           @unique
-  barcode          String?          @unique  // ✅ NOUVEAU CHAMP AJOUTÉ
   brand            String?
   category         String?          @default("générique")
   tags             String[]         @default([])
@@ -31,6 +30,7 @@ model Product {
   created_at       DateTime         @default(now())
   updated_at       DateTime         @updatedAt
   image_url        String?
+  barcode          String?          @unique
   partnerLinks     PartnerLink[]
 
   @@map("products")
@@ -85,12 +85,12 @@ enum ConfidenceColor {
   green
   yellow
   red
-  orange  // ✅ AJOUTÉ pour plus de nuances
+  orange
 }
 
 enum VerifiedStatus {
   verified
   manual_review
   rejected
-  ai_analyzed  // ✅ AJOUTÉ pour les produits analysés par IA
+  ai_analyzed
 }
