@@ -31,23 +31,23 @@ export const detectUltraTransformation = (ingredients: string[]): {
   for (const ing of ingredients) {
     for (const keyword of suspiciousKeywords) {
       if (ing.toLowerCase().includes(keyword)) {
-        found.push(keyword);
+        if (!found.includes(keyword)) {
+          found.push(keyword); // ✅ Pas besoin de Set
+        }
       }
     }
   }
 
-  const uniqueFound = [...new Set(found)];
-
   let level: 'léger' | 'modéré' | 'sévère' = 'léger';
   let score = 25;
 
-  if (uniqueFound.length >= 3) {
+  if (found.length >= 3) {
     level = 'sévère';
     score = 90;
-  } else if (uniqueFound.length === 2) {
+  } else if (found.length === 2) {
     level = 'modéré';
     score = 65;
-  } else if (uniqueFound.length === 1) {
+  } else if (found.length === 1) {
     level = 'léger';
     score = 40;
   }
@@ -55,8 +55,8 @@ export const detectUltraTransformation = (ingredients: string[]): {
   return {
     level,
     score,
-    detected: uniqueFound,
-    justification: `Analyse des ingrédients : ${uniqueFound.length} procédé(s) suspect(s) détecté(s) (${uniqueFound.join(', ')})`
+    detected: found,
+    justification: `Analyse des ingrédients : ${found.length} procédé(s) suspect(s) détecté(s) (${found.join(', ')})`
   };
 };
 
