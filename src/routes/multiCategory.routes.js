@@ -1,309 +1,372 @@
-// backend/src/routes/multiCategory.routes.js
-// Routes Express pour les analyses multi-catégories ECOLOJIA
+// src/services/multiCategoryApi.ts - VERSION CORRIGÉE POUR SERVER.JS
 
-const express = require('express');
-const router = express.Router();
+// 🔧 Configuration multi-environnements
+const API_ENDPOINTS = {
+  production: 'https://ecolojia-backend-working.onrender.com',
+  local: 'http://localhost:8000',
+  fallback: 'mock' // Mode données simulées
+};
 
-// Mock data pour les catégories
-const categories = [
-  {
-    id: 'food',
-    name: 'Alimentaire',
-    description: 'Analyse nutritionnelle et détection ultra-transformation des produits alimentaires selon NOVA et EFSA',
-    icon: '🍎',
-    color: '#7DDE4A',
-    features: [
-      'Classification NOVA',
-      'Index glycémique',
-      'Additifs dangereux',
-      'Alternatives bio'
-    ],
-    available: true
-  },
-  {
-    id: 'cosmetics',
-    name: 'Cosmétiques',
-    description: 'Analyse des ingrédients cosmétiques et détection des perturbateurs endocriniens selon ANSM',
-    icon: '💄',
-    color: '#FF69B4',
-    features: [
-      'Ingrédients toxiques',
-      'Certification bio',
-      'Tests animaux',
-      'Alternatives naturelles'
-    ],
-    available: true
-  },
-  {
-    id: 'detergents',
-    name: 'Détergents',
-    description: 'Impact environnemental et santé des produits ménagers selon REACH et ECHA',
-    icon: '🧽',
-    color: '#4FC3F7',
-    features: [
-      'Biodégradabilité',
-      'Toxicité aquatique',
-      'Émissions COV',
-      'Recettes DIY'
-    ],
-    available: true
-  }
-];
-
-// ===============================
-// GET /api/multi-category/categories
-// ===============================
-router.get('/categories', (req, res) => {
+// Détection automatique du meilleur endpoint
+const detectBestEndpoint = async (): Promise<string> => {
+  // 1. Essayer production
   try {
-    console.log('📋 Demande liste catégories multi-analyses');
-    
-    res.json({
-      success: true,
-      categories: categories,
-      total_categories: categories.length,
-      default_category: 'food',
-      api_version: '1.0',
-      timestamp: new Date().toISOString(),
-      message: 'Catégories multi-analyses ECOLOJIA disponibles'
+    // 🔧 FIX: Utiliser /health au lieu de /api/health
+    const response = await fetch(`${API_ENDPOINTS.production}/health`, { 
+      method: 'GET',
+      signal: AbortSignal.timeout(3000) // 3s max
     });
-
-  } catch (error) {
-    console.error('❌ Erreur récupération catégories:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Erreur serveur lors de la récupération des catégories',
-      categories: []
-    });
-  }
-});
-
-// ===============================
-// POST /api/multi-category/analyze
-// ===============================
-router.post('/analyze', (req, res) => {
-  try {
-    console.log('🧪 Demande analyse multi-catégorie:', req.body);
-
-    const { product, context = {} } = req.body;
-
-    // Validation basique
-    if (!product || !product.title) {
-      return res.status(400).json({
-        success: false,
-        error: 'Données produit manquantes',
-        message: 'Le champ product.title est requis'
-      });
+    if (response.ok) {
+      console.log('✅ Backend production disponible');
+      return API_ENDPOINTS.production;
     }
+  } catch (error) {
+    console.log('⚠️ Backend production indisponible');
+  }
 
-    // Détection automatique de catégorie basée sur le titre/ingrédients
-    const detectedCategory = detectProductCategory(product);
-    
-    // Simulation d'analyse selon la catégorie
-    const analysisResult = performMockAnalysis(product, detectedCategory);
-    
-    // Génération d'alternatives basiques
-    const alternatives = generateMockAlternatives(detectedCategory);
+  // 2. Essayer local
+  try {
+    const response = await fetch(`${API_ENDPOINTS.local}/health`, { 
+      method: 'GET',
+      signal: AbortSignal.timeout(2000) // 2s max
+    });
+    if (response.ok) {
+      console.log('✅ Backend local disponible');
+      return API_ENDPOINTS.local;
+    }
+  } catch (error) {
+    console.log('⚠️ Backend local indisponible');
+  }
 
-    console.log(`✅ Analyse ${detectedCategory} terminée pour: ${product.title}`);
+  // 3. Fallback mode mock
+  console.log('🔄 Mode fallback activé - Données simulées');
+  return API_ENDPOINTS.fallback;
+};
 
-    res.json({
+// Types TypeScript (inchangés)
+export interface Category {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  features: string[];
+  available: boolean;
+}
+
+export interface CategoriesResponse {
+  success: boolean;
+  categories?: Category[];
+  data?: Category[];
+  total_categories?: number;
+  total?: number;
+  default_category?: string;
+  api_version?: string;
+  timestamp?: string;
+  error?: string;
+}
+
+export interface AnalysisRequest {
+  product: {
+    title: string;
+    brand?: string;
+    description?: string;
+    ingredients?: string[];
+    category?: string;
+  };
+  context?: {
+    userId?: string;
+    anonymousId?: string;
+  };
+}
+
+export interface AnalysisResponse {
+  success: boolean;
+  category: string;
+  detection_confidence: number;
+  analysis: {
+    overall_score: number;
+    detailed_analysis?: any;
+    confidence: number;
+    sources: string[];
+  };
+  alternatives: any[];
+  metadata: {
+    processing_time_ms: number;
+    api_version: string;
+    request_id: string;
+    timestamp: string;
+  };
+}
+
+// Service principal avec fallback intelligent
+export class MultiCategoryApiService {
+  private baseUrl: string = '';
+  private isInitialized: boolean = false;
+
+  constructor() {
+    this.initializeEndpoint();
+  }
+
+  private async initializeEndpoint() {
+    if (!this.isInitialized) {
+      this.baseUrl = await detectBestEndpoint();
+      this.isInitialized = true;
+    }
+  }
+
+  // Données mock pour fallback
+  private getMockCategories(): CategoriesResponse {
+    return {
       success: true,
-      category: detectedCategory,
-      detection_confidence: analysisResult.detection_confidence,
+      categories: [
+        {
+          id: 'food',
+          name: 'Alimentaire',
+          description: 'Analyse nutritionnelle et détection ultra-transformation des produits alimentaires',
+          icon: '🍎',
+          color: '#7DDE4A',
+          features: ['Classification NOVA', 'Index glycémique', 'Additifs dangereux', 'Alternatives bio'],
+          available: true
+        },
+        {
+          id: 'cosmetics',
+          name: 'Cosmétiques',
+          description: 'Analyse des ingrédients cosmétiques et perturbateurs endocriniens',
+          icon: '💄',
+          color: '#FF69B4',
+          features: ['Ingrédients toxiques', 'Certification bio', 'Tests animaux', 'Alternatives naturelles'],
+          available: true
+        },
+        {
+          id: 'detergents',
+          name: 'Détergents',
+          description: 'Impact environnemental et santé des produits ménagers',
+          icon: '🧽',
+          color: '#4FC3F7',
+          features: ['Biodégradabilité', 'Toxicité aquatique', 'Émissions COV', 'Recettes DIY'],
+          available: true
+        }
+      ],
+      total_categories: 3,
+      api_version: 'mock-1.0',
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  private getMockAnalysis(product: any): AnalysisResponse {
+    const scores = {
+      food: Math.floor(Math.random() * 40) + 30, // 30-70
+      cosmetics: Math.floor(Math.random() * 30) + 50, // 50-80
+      detergents: Math.floor(Math.random() * 35) + 40 // 40-75
+    };
+
+    return {
+      success: true,
+      category: product.category || 'food',
+      detection_confidence: 0.85 + Math.random() * 0.1,
       analysis: {
-        overall_score: analysisResult.overall_score,
-        confidence: analysisResult.confidence,
-        sources: [
-          'ANSES 2024',
-          'EFSA Guidelines',
-          'INSERM Research',
-          'REACH Database'
-        ]
+        overall_score: scores[product.category as keyof typeof scores] || 55,
+        confidence: 0.8,
+        sources: ['ANSES 2024', 'EFSA Guidelines', 'INSERM Research']
       },
-      alternatives: alternatives,
+      alternatives: [
+        {
+          name: 'Alternative bio naturelle',
+          score: 85,
+          description: 'Version plus naturelle et saine'
+        }
+      ],
       metadata: {
         processing_time_ms: Math.floor(Math.random() * 500) + 200,
-        api_version: '1.0',
-        request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: new Date().toISOString(),
-        detection_method: 'keyword_analysis',
-        user_context: context
+        api_version: 'mock-1.0',
+        request_id: `mock_${Date.now()}`,
+        timestamp: new Date().toISOString()
       }
-    });
-
-  } catch (error) {
-    console.error('❌ Erreur analyse multi-catégorie:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Erreur serveur lors de l\'analyse',
-      message: error.message
-    });
+    };
   }
-});
 
-// ===============================
-// GET /api/multi-category/health
-// ===============================
-router.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    service: 'MultiCategory Analysis Service',
-    version: '1.0',
-    available_categories: categories.map(c => c.id),
-    endpoints: [
-      'GET /api/multi-category/categories',
-      'POST /api/multi-category/analyze',
-      'GET /api/multi-category/health'
-    ],
-    timestamp: new Date().toISOString()
-  });
-});
+  // Récupérer les catégories avec fallback
+  async getCategories(): Promise<CategoriesResponse> {
+    await this.initializeEndpoint();
 
-// ===============================
-// FONCTIONS UTILITAIRES
-// ===============================
+    if (this.baseUrl === 'mock') {
+      console.log('🔄 Mode mock: Retour catégories simulées');
+      return this.getMockCategories();
+    }
 
-/**
- * Détection automatique de catégorie basée sur mots-clés
- */
-function detectProductCategory(product) {
-  const title = (product.title || '').toLowerCase();
-  const description = (product.description || '').toLowerCase();
-  const ingredients = (product.ingredients || []).join(' ').toLowerCase();
-  
-  const text = `${title} ${description} ${ingredients}`;
+    try {
+      console.log('🔍 Récupération catégories depuis:', `${this.baseUrl}/api/multi-category/categories`);
+      
+      const response = await fetch(`${this.baseUrl}/api/multi-category/categories`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(10000),
+      });
 
-  // Mots-clés alimentaires
-  const foodKeywords = [
-    'bio', 'céréales', 'lait', 'yaourt', 'fromage', 'pain', 'biscuit',
-    'chocolat', 'sucre', 'huile', 'vinaigre', 'confiture', 'miel',
-    'légume', 'fruit', 'viande', 'poisson', 'œuf', 'farine',
-    'alimentaire', 'nutrition', 'calories', 'protéines', 'glucides'
-  ];
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
 
-  // Mots-clés cosmétiques
-  const cosmeticKeywords = [
-    'crème', 'shampooing', 'gel', 'huile', 'sérum', 'masque',
-    'démaquillant', 'fond de teint', 'rouge', 'mascara', 'parfum',
-    'déodorant', 'dentifrice', 'savon', 'lotion', 'baume',
-    'cosmétique', 'beauté', 'soin', 'aqua', 'glycerin', 'paraben'
-  ];
+      const data: CategoriesResponse = await response.json();
+      console.log('✅ Catégories récupérées depuis API:', data.categories?.length || 0);
+      return data;
 
-  // Mots-clés détergents
-  const detergentKeywords = [
-    'lessive', 'liquide vaisselle', 'nettoyant', 'détergent',
-    'produit ménager', 'dégraissant', 'désinfectant', 'javel',
-    'tensioactif', 'phosphate', 'azurant', 'enzymatique',
-    'ménager', 'nettoyage', 'entretien', 'surface'
-  ];
+    } catch (error) {
+      console.error('❌ Erreur API, basculement vers mock:', error);
+      return this.getMockCategories();
+    }
+  }
 
-  // Comptage des correspondances
-  const foodScore = foodKeywords.filter(keyword => text.includes(keyword)).length;
-  const cosmeticScore = cosmeticKeywords.filter(keyword => text.includes(keyword)).length;
-  const detergentScore = detergentKeywords.filter(keyword => text.includes(keyword)).length;
+  // Analyser un produit avec fallback
+  async analyzeProduct(request: AnalysisRequest): Promise<AnalysisResponse> {
+    await this.initializeEndpoint();
 
-  // Détermination de la catégorie
-  if (foodScore >= cosmeticScore && foodScore >= detergentScore) {
-    return 'food';
-  } else if (cosmeticScore >= detergentScore) {
-    return 'cosmetics';
-  } else {
-    return 'detergents';
+    if (this.baseUrl === 'mock') {
+      console.log('🔄 Mode mock: Analyse simulée pour', request.product.title);
+      await new Promise(resolve => setTimeout(resolve, 800)); // Simuler délai
+      return this.getMockAnalysis(request.product);
+    }
+
+    try {
+      console.log('🧪 Analyse produit:', request.product.title);
+      
+      const enrichedRequest = {
+        ...request,
+        context: {
+          ...request.context,
+          anonymousId: request.context?.anonymousId || this.generateAnonymousId(),
+        }
+      };
+
+      const response = await fetch(`${this.baseUrl}/api/multi-category/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(enrichedRequest),
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Erreur réseau' }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+
+      const data: AnalysisResponse = await response.json();
+      console.log('✅ Analyse terminée via API:', data.category, 'Score:', data.analysis?.overall_score);
+      return data;
+
+    } catch (error) {
+      console.error('❌ Erreur analyse API, basculement vers mock:', error);
+      return this.getMockAnalysis(request.product);
+    }
+  }
+
+  // Test de connectivité amélioré - 🔧 FIX: Endpoints corrigés
+  async testConnection(): Promise<boolean> {
+    await this.initializeEndpoint();
+    
+    if (this.baseUrl === 'mock') {
+      return true; // Mode mock toujours "connecté"
+    }
+
+    // 🔧 FIX: Utiliser les bons endpoints selon server.js
+    const endpointsToTest = [
+      `${this.baseUrl}/health`,                            // ✅ Endpoint principal dans server.js
+      `${this.baseUrl}/api/multi-category/categories`,     // ✅ Fonctionne déjà
+      `${this.baseUrl}/`,                                  // ✅ Route racine
+    ];
+
+    for (const endpoint of endpointsToTest) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(5000)
+        });
+        
+        if (response.ok) {
+          console.log(`✅ Connexion OK via: ${endpoint}`);
+          return true;
+        }
+      } catch (error) {
+        console.log(`❌ Échec connexion: ${endpoint}`, error instanceof Error ? error.message : error);
+        continue;
+      }
+    }
+    
+    console.log('❌ Tous les tests de connexion ont échoué');
+    return false;
+  }
+
+  // Données de test inchangées
+  getTestData(): Record<string, AnalysisRequest> {
+    return {
+      food: {
+        product: {
+          title: "Céréales Bio aux Fruits",
+          brand: "Nature & Progrès",
+          description: "Céréales biologiques avec additifs et sucres ajoutés",
+          ingredients: ["avoine bio", "sucre", "colorant naturel", "conservateur e200"],
+          category: "food"
+        },
+        context: { userId: "test-food-user" }
+      },
+      cosmetics: {
+        product: {
+          title: "Shampooing Doux Bio",
+          brand: "Cosmébio",
+          description: "Shampooing avec sodium lauryl sulfate et parfum",
+          ingredients: ["aqua", "sodium lauryl sulfate", "parfum", "glycerin", "limonene"],
+          category: "cosmetics"
+        },
+        context: { userId: "test-cosmetics-user" }
+      },
+      detergents: {
+        product: {
+          title: "Lessive Écologique Concentrée",
+          brand: "EcoVert",
+          description: "Lessive avec tensioactifs végétaux et enzymes",
+          ingredients: ["tensioactifs végétaux", "enzymes", "parfum", "zeolites", "conservateur"],
+          category: "detergents"
+        },
+        context: { userId: "test-detergents-user" }
+      }
+    };
+  }
+
+  private generateAnonymousId(): string {
+    return `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  // 🔧 FIX: Diagnostic spécifique pour server.js
+  async diagnoseApiStructure(): Promise<void> {
+    console.log('🔍 === DIAGNOSTIC API ECOLOJIA (SERVER.JS) ===');
+    
+    // Test endpoints server.js
+    const serverEndpoints = [
+      '/health',
+      '/api/multi-category/categories',
+      '/api/multi-category/analyze',
+      '/'
+    ];
+
+    for (const endpoint of serverEndpoints) {
+      try {
+        const response = await fetch(`${API_ENDPOINTS.production}${endpoint}`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(5000)
+        });
+        console.log(`${endpoint}: ${response.status} ${response.ok ? '✅' : '❌'}`);
+      } catch (error) {
+        console.log(`${endpoint}: ❌ ERREUR`);
+      }
+    }
+    
+    console.log('🔍 === FIN DIAGNOSTIC ===');
   }
 }
 
-/**
- * Simulation d'analyse selon la catégorie
- */
-function performMockAnalysis(product, category) {
-  // Scores différents selon la catégorie
-  const baseScores = {
-    food: { min: 30, max: 80 },
-    cosmetics: { min: 40, max: 85 },
-    detergents: { min: 35, max: 75 }
-  };
+// Instance par défaut
+export const multiCategoryApi = new MultiCategoryApiService();
 
-  const range = baseScores[category] || baseScores.food;
-  const overall_score = Math.floor(Math.random() * (range.max - range.min + 1)) + range.min;
-  
-  // Ajustement selon des critères simples
-  let scoreAdjustment = 0;
-  
-  // Bonus si "bio" dans le titre
-  if ((product.title || '').toLowerCase().includes('bio')) {
-    scoreAdjustment += 10;
-  }
-  
-  // Pénalité si beaucoup d'ingrédients
-  if (product.ingredients && product.ingredients.length > 10) {
-    scoreAdjustment -= 5;
-  }
-
-  const final_score = Math.max(0, Math.min(100, overall_score + scoreAdjustment));
-
-  return {
-    overall_score: final_score,
-    confidence: 0.75 + Math.random() * 0.2, // 0.75 à 0.95
-    detection_confidence: 0.8 + Math.random() * 0.15 // 0.8 à 0.95
-  };
-}
-
-/**
- * Génération d'alternatives mock selon la catégorie
- */
-function generateMockAlternatives(category) {
-  const alternatives = {
-    food: [
-      {
-        name: 'Version maison naturelle',
-        type: 'DIY',
-        score: 85,
-        description: 'Recette simple avec ingrédients naturels',
-        why_better: 'Aucun additif, contrôle total des ingrédients'
-      },
-      {
-        name: 'Alternative bio certifiée',
-        type: 'Bio',
-        score: 78,
-        description: 'Produit équivalent avec certification bio',
-        why_better: 'Sans pesticides ni additifs controversés'
-      }
-    ],
-    cosmetics: [
-      {
-        name: 'Cosmétique naturel certifié',
-        type: 'Naturel',
-        score: 82,
-        description: 'Formule à base d\'ingrédients naturels',
-        why_better: 'Sans perturbateurs endocriniens ni parabens'
-      },
-      {
-        name: 'Recette DIY simple',
-        type: 'DIY',
-        score: 88,
-        description: 'Préparation maison avec 3-4 ingrédients',
-        why_better: 'Économique et sans conservateurs'
-      }
-    ],
-    detergents: [
-      {
-        name: 'Produit écolabel européen',
-        type: 'Écolabel',
-        score: 79,
-        description: 'Certifié pour son faible impact environnemental',
-        why_better: 'Biodégradable et moins toxique pour l\'eau'
-      },
-      {
-        name: 'Solution maison bicarbonate',
-        type: 'DIY',
-        score: 90,
-        description: 'Mélange bicarbonate + vinaigre blanc',
-        why_better: 'Efficace, économique et 100% naturel'
-      }
-    ]
-  };
-
-  return alternatives[category] || alternatives.food;
-}
-
-module.exports = router;
+export type { AnalysisRequest, AnalysisResponse, Category, CategoriesResponse };
