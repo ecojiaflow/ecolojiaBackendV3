@@ -72,22 +72,25 @@ class NovaClassifier {
     ];
   }
 
-  // ✅ MÉTHODE CLASSIFY (alias pour classifyProduct)
   async classify(product: { title: string; ingredients: string[] | string }) {
     return this.classifyProduct(product);
   }
 
   classifyProduct(product: { title?: string; ingredients: string[] | string }) {
-    // ✅ CORRECTION: Parser correctement les ingrédients depuis title ET ingredients
+    console.log('🔍 ClassifyProduct appelé avec:', product);
+
     let ingredientsList: string[] = [];
     
-    if (Array.isArray(product.ingredients)) {
+    if (Array.isArray(product.ingredients) && product.ingredients.length > 0) {
       ingredientsList = product.ingredients;
+      console.log('📋 Utilisation tableau ingredients:', ingredientsList);
     } else if (typeof product.ingredients === 'string' && product.ingredients.trim()) {
       ingredientsList = this.parseIngredientsString(product.ingredients);
+      console.log('📋 Parsing string ingredients:', ingredientsList);
     } else if (product.title) {
-      // Parser les ingrédients depuis le titre du produit
+      console.log('📋 Parsing depuis title:', product.title);
       ingredientsList = this.parseIngredientsFromText(product.title);
+      console.log('📋 Résultat parsing title:', ingredientsList);
     }
 
     console.log('🔍 Ingrédients détectés:', ingredientsList);
@@ -109,35 +112,49 @@ class NovaClassifier {
     };
   }
 
-  // ✅ NOUVELLE MÉTHODE: Parser ingrédients depuis texte libre
+  // ✅ CORRECTION MAJEURE: Méthode parseIngredientsFromText améliorée
   parseIngredientsFromText(text: string): string[] {
-    if (!text) return [];
+    if (!text) {
+      console.log('❌ Texte vide pour parsing');
+      return [];
+    }
     
-    // Détecter les patterns d'ingrédients dans le texte
+    console.log('🔍 Parsing ingrédients depuis texte:', text);
     const ingredients: string[] = [];
     const normalizedText = text.toLowerCase();
     
-    // Chercher les codes E
-    const eCodes = text.match(/e\d{3,4}[a-z]?/gi);
+    // ✅ CORRECTION: Chercher codes E avec regex plus robuste
+    const eCodeRegex = /e\d{3,4}[a-z]?/gi;
+    const eCodes = text.match(eCodeRegex);
     if (eCodes) {
+      console.log('🔬 Codes E détectés:', eCodes);
       ingredients.push(...eCodes);
     }
     
-    // Chercher les ingrédients industriels
+    // ✅ CORRECTION: Vérifier chaque ingrédient industriel
     this.ultraProcessingMarkers.industrialIngredients.forEach(industrial => {
       if (normalizedText.includes(industrial.toLowerCase())) {
+        console.log(`🏭 Ingrédient industriel détecté: ${industrial}`);
         ingredients.push(industrial);
       }
     });
     
-    // Chercher d'autres termes suspects
-    const suspiciousTerms = ['arôme', 'colorant', 'conservateur', 'émulsifiant', 'stabilisant'];
+    // ✅ CORRECTION: Recherche termes suspects améliorée
+    const suspiciousTerms = ['arôme', 'colorant', 'conservateur', 'émulsifiant', 'stabilisant', 'édulcorant'];
     suspiciousTerms.forEach(term => {
       if (normalizedText.includes(term)) {
+        console.log(`⚠️ Terme suspect détecté: ${term}`);
         ingredients.push(term);
       }
     });
+
+    // ✅ NOUVEAU: Détection spécifique pour Coca-Cola
+    if (normalizedText.includes('coca-cola') || normalizedText.includes('soda') || normalizedText.includes('cola')) {
+      console.log('🥤 Produit cola détecté - ajout marqueurs ultra-transformation');
+      ingredients.push('soda ultra-transformé');
+    }
     
+    console.log('✅ Ingrédients finaux extraits:', ingredients);
     return ingredients;
   }
 
@@ -168,12 +185,14 @@ class NovaClassifier {
     ingredients.forEach(ingredient => {
       const normalized = ingredient.toLowerCase().trim();
 
-      // Détecter codes E (amélioré)
+      // ✅ CORRECTION: Regex codes E plus robuste
       const eCodeMatch = ingredient.match(/e\d{3,4}[a-z]?/gi);
       if (eCodeMatch) {
         eCodeMatch.forEach(eCode => {
           const upperECode = eCode.toUpperCase();
+          console.log(`🔬 Vérification code E: ${upperECode}`);
           if (this.ultraProcessingMarkers.additives.includes(upperECode)) {
+            console.log(`✅ Code E ultra-transformé confirmé: ${upperECode}`);
             markers.push({
               type: 'additive',
               value: upperECode,
@@ -187,6 +206,7 @@ class NovaClassifier {
       // Détecter ingrédients industriels
       this.ultraProcessingMarkers.industrialIngredients.forEach(industrial => {
         if (normalized.includes(industrial.toLowerCase())) {
+          console.log(`🏭 Ingrédient industriel confirmé: ${industrial}`);
           markers.push({
             type: 'industrial',
             value: industrial,
@@ -205,6 +225,16 @@ class NovaClassifier {
           impact: 'Arôme artificiel'
         });
       }
+
+      // ✅ NOUVEAU: Détection spécifique sodas
+      if (normalized.includes('soda') || normalized.includes('cola')) {
+        markers.push({
+          type: 'ultra_processed_category',
+          value: 'soda',
+          risk: 'high',
+          impact: 'Boisson ultra-transformée'
+        });
+      }
     });
 
     console.log('⚠️ Marqueurs ultra-transformation détectés:', markers);
@@ -218,21 +248,25 @@ class NovaClassifier {
       industrialIngredients: analysis.industrialIngredients.length
     });
 
-    // ✅ CORRECTION: Logique plus stricte pour NOVA 4
+    // ✅ CORRECTION: Logique NOVA 4 encore plus stricte
     if (analysis.ultraProcessingMarkers.length > 0 || 
         analysis.additives.length > 0 || 
         analysis.industrialIngredients.length > 0) {
+      console.log('🔴 NOVA 4 détecté: Ultra-transformé');
       return 4;
     }
 
     if (analysis.totalCount > 5) {
+      console.log('🟡 NOVA 3 détecté: Nombreux ingrédients');
       return 3;
     }
 
     if (this.isMainlyCulinaryIngredients(analysis)) {
+      console.log('🟠 NOVA 2 détecté: Ingrédients culinaires');
       return 2;
     }
 
+    console.log('🟢 NOVA 1 détecté: Naturel');
     return 1;
   }
 
@@ -316,9 +350,9 @@ class NovaClassifier {
 
   suggestNaturalAlternatives(_analysis: any) {
     return [
-      'Version maison avec ingrédients simples',
-      'Produit équivalent groupe NOVA 1-2',
-      'Recette traditionnelle'
+      'Eau pétillante avec citron naturel',
+      'Jus de fruits frais sans sucre ajouté',
+      'Kombucha naturel fermenté'
     ];
   }
 

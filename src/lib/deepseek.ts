@@ -1,40 +1,13 @@
-import type { Product } from "@prisma/client";
-
-async function calculate(product: Product): Promise<{
-  eco_score: number;
-  ai_confidence: number;
-}> {
-  console.log("🤖 Appel DeepSeek simulé pour :", product.title);
-
-  return {
-    eco_score: Math.random(), // test aléatoire
-    ai_confidence: 0.85
-  };
-}
-
-async function getSimilar(product: Product) {
-  console.log("🧠 Suggestions IA simulées pour :", product.title);
-
-  return [
-    {
-      id: "sim-001",
-      title: "Savon solide karité",
-      slug: "savon-solide-karite",
-      image_url: null,
-      eco_score: 0.81
-    },
-    {
-      id: "sim-002",
-      title: "Shampoing solide bio",
-      slug: "shampoing-solide-bio",
-      image_url: null,
-      eco_score: 0.74
-    }
-  ];
-}
-
-export default {
-  calculate,
-  getSimilar
+// PATH: src/lib/deepseek.ts
+type DeepseekInput = {
+  title: string;
+  id: string;
 };
 
+export const calculate = async ({ title, id }: DeepseekInput): Promise<number> => {
+  // Simulation d'un calcul (remplacer par logique réelle si dispo)
+  const hash = [...title].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  const score = (hash + id.length * 10) % 100;
+  return score;
+};
+// EOF
