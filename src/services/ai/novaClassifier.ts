@@ -37,18 +37,19 @@ class NovaClassifier {
 
     this.ultraProcessingMarkers = {
       additives: [
-        'E102', 'E110', 'E124', 'E129', 'E131', 'E133', 'E151',
+        'E102', 'E110', 'E124', 'E129', 'E131', 'E133', 'E150D', 'E151',
         'E220', 'E221', 'E222', 'E223', 'E224', 'E228',
         'E249', 'E250', 'E251', 'E252',
         'E320', 'E321',
         'E338', 'E339', 'E340', 'E341', 'E450', 'E451', 'E452',
-        'E471', 'E472a', 'E472b', 'E472c', 'E472e', 'E473', 'E475',
+        'E471', 'E472A', 'E472B', 'E472C', 'E472E', 'E473', 'E475',
         'E950', 'E951', 'E952', 'E954', 'E955', 'E960', 'E961'
       ],
       industrialIngredients: [
+        'sirop de glucose-fructose', 'sirop glucose-fructose', 'glucose-fructose',
         'protéines hydrolysées', 'isolat de protéine', 'huiles hydrogénées',
-        'sirop de glucose-fructose', 'sirop de maïs', 'maltodextrine',
-        'dextrose', 'inuline', 'poudres de protéines', 'arômes artificiels'
+        'sirop de maïs', 'maltodextrine', 'dextrose', 'inuline', 
+        'poudres de protéines', 'arômes artificiels', 'huile de palme'
       ],
       industrialProcesses: [
         'extrusion', 'pressage à chaud', 'hydrogénation', 'fractionnement',
@@ -71,14 +72,31 @@ class NovaClassifier {
     ];
   }
 
-  // ✅ MÉTHODE CLASSIFY AJOUTÉE (alias pour classifyProduct)
+  // ✅ MÉTHODE CLASSIFY (alias pour classifyProduct)
   async classify(product: { title: string; ingredients: string[] | string }) {
     return this.classifyProduct(product);
   }
 
   classifyProduct(product: { title?: string; ingredients: string[] | string }) {
-    const analysis = this.analyzeIngredients(product.ingredients || []);
+    // ✅ CORRECTION: Parser correctement les ingrédients depuis title ET ingredients
+    let ingredientsList: string[] = [];
+    
+    if (Array.isArray(product.ingredients)) {
+      ingredientsList = product.ingredients;
+    } else if (typeof product.ingredients === 'string' && product.ingredients.trim()) {
+      ingredientsList = this.parseIngredientsString(product.ingredients);
+    } else if (product.title) {
+      // Parser les ingrédients depuis le titre du produit
+      ingredientsList = this.parseIngredientsFromText(product.title);
+    }
+
+    console.log('🔍 Ingrédients détectés:', ingredientsList);
+
+    const analysis = this.analyzeIngredients(ingredientsList);
     const novaGroup = this.determineNovaGroup(analysis);
+
+    console.log('📊 Analyse:', analysis);
+    console.log('⭐ Groupe NOVA:', novaGroup);
 
     return {
       novaGroup,
@@ -91,19 +109,57 @@ class NovaClassifier {
     };
   }
 
-  analyzeIngredients(ingredients: string[] | string) {
-    const ingredientsList = Array.isArray(ingredients)
-      ? ingredients
-      : this.parseIngredientsString(ingredients);
+  // ✅ NOUVELLE MÉTHODE: Parser ingrédients depuis texte libre
+  parseIngredientsFromText(text: string): string[] {
+    if (!text) return [];
+    
+    // Détecter les patterns d'ingrédients dans le texte
+    const ingredients: string[] = [];
+    const normalizedText = text.toLowerCase();
+    
+    // Chercher les codes E
+    const eCodes = text.match(/e\d{3,4}[a-z]?/gi);
+    if (eCodes) {
+      ingredients.push(...eCodes);
+    }
+    
+    // Chercher les ingrédients industriels
+    this.ultraProcessingMarkers.industrialIngredients.forEach(industrial => {
+      if (normalizedText.includes(industrial.toLowerCase())) {
+        ingredients.push(industrial);
+      }
+    });
+    
+    // Chercher d'autres termes suspects
+    const suspiciousTerms = ['arôme', 'colorant', 'conservateur', 'émulsifiant', 'stabilisant'];
+    suspiciousTerms.forEach(term => {
+      if (normalizedText.includes(term)) {
+        ingredients.push(term);
+      }
+    });
+    
+    return ingredients;
+  }
 
-    return {
-      totalCount: ingredientsList.length,
-      ultraProcessingMarkers: this.detectUltraProcessingMarkers(ingredientsList),
-      industrialIngredients: this.detectIndustrialIngredients(ingredientsList),
-      additives: this.detectAdditives(ingredientsList),
-      naturalIngredients: this.detectNaturalIngredients(ingredientsList),
-      suspiciousTerms: this.detectSuspiciousTerms(ingredientsList)
+  analyzeIngredients(ingredients: string[]) {
+    console.log('🧪 Analyse des ingrédients:', ingredients);
+
+    const analysis = {
+      totalCount: ingredients.length,
+      ultraProcessingMarkers: this.detectUltraProcessingMarkers(ingredients),
+      industrialIngredients: this.detectIndustrialIngredients(ingredients),
+      additives: this.detectAdditives(ingredients),
+      naturalIngredients: this.detectNaturalIngredients(ingredients),
+      suspiciousTerms: this.detectSuspiciousTerms(ingredients)
     };
+
+    console.log('📋 Résultat analyse:', {
+      additives: analysis.additives,
+      industrialIngredients: analysis.industrialIngredients,
+      ultraProcessingMarkers: analysis.ultraProcessingMarkers.length
+    });
+
+    return analysis;
   }
 
   detectUltraProcessingMarkers(ingredients: string[]) {
@@ -112,20 +168,23 @@ class NovaClassifier {
     ingredients.forEach(ingredient => {
       const normalized = ingredient.toLowerCase().trim();
 
-      const eCodeMatch = normalized.match(/e\d{3,4}[a-z]?/g);
+      // Détecter codes E (amélioré)
+      const eCodeMatch = ingredient.match(/e\d{3,4}[a-z]?/gi);
       if (eCodeMatch) {
         eCodeMatch.forEach(eCode => {
-          if (this.ultraProcessingMarkers.additives.includes(eCode.toUpperCase())) {
+          const upperECode = eCode.toUpperCase();
+          if (this.ultraProcessingMarkers.additives.includes(upperECode)) {
             markers.push({
               type: 'additive',
-              value: eCode.toUpperCase(),
-              risk: this.getAdditiveRisk(eCode.toUpperCase()),
+              value: upperECode,
+              risk: this.getAdditiveRisk(upperECode),
               impact: 'Marqueur ultra-transformation'
             });
           }
         });
       }
 
+      // Détecter ingrédients industriels
       this.ultraProcessingMarkers.industrialIngredients.forEach(industrial => {
         if (normalized.includes(industrial.toLowerCase())) {
           markers.push({
@@ -137,6 +196,7 @@ class NovaClassifier {
         }
       });
 
+      // Détecter arômes artificiels
       if (normalized.includes('arôme') && !normalized.includes('naturel')) {
         markers.push({
           type: 'artificial_flavor',
@@ -147,19 +207,25 @@ class NovaClassifier {
       }
     });
 
+    console.log('⚠️ Marqueurs ultra-transformation détectés:', markers);
     return markers;
   }
 
   determineNovaGroup(analysis: any) {
-    if (analysis.ultraProcessingMarkers.length > 0 ||
-      analysis.totalCount > 5 ||
-      analysis.additives.length > 2) {
+    console.log('🎯 Déterminant groupe NOVA avec:', {
+      ultraProcessingMarkers: analysis.ultraProcessingMarkers.length,
+      additives: analysis.additives.length,
+      industrialIngredients: analysis.industrialIngredients.length
+    });
+
+    // ✅ CORRECTION: Logique plus stricte pour NOVA 4
+    if (analysis.ultraProcessingMarkers.length > 0 || 
+        analysis.additives.length > 0 || 
+        analysis.industrialIngredients.length > 0) {
       return 4;
     }
 
-    if (analysis.additives.length > 0 ||
-      analysis.industrialIngredients.length > 0 ||
-      analysis.totalCount > 3) {
+    if (analysis.totalCount > 5) {
       return 3;
     }
 
@@ -299,8 +365,8 @@ class NovaClassifier {
   }
 
   getAdditiveRisk(eCode: string) {
-    const highRisk = ['E102', 'E110', 'E124', 'E129', 'E249', 'E250', 'E320', 'E321'];
-    const mediumRisk = ['E471', 'E472a', 'E951', 'E952'];
+    const highRisk = ['E102', 'E110', 'E124', 'E129', 'E150D', 'E249', 'E250', 'E320', 'E321'];
+    const mediumRisk = ['E471', 'E472A', 'E951', 'E952'];
     if (highRisk.includes(eCode)) return 'high';
     if (mediumRisk.includes(eCode)) return 'medium';
     return 'low';
