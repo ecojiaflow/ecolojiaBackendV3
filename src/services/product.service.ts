@@ -129,12 +129,8 @@ export class ProductService {
   async getProductById(id: string) {
     try {
       const product = await prisma.product.findUnique({
-        where: { id },
-        include: {
-          _count: {
-            select: { id: true }
-          }
-        }
+        where: { id }
+        // ✅ CORRECTION: supprimer _count qui n'existe pas
       });
       
       if (!product) {
@@ -158,7 +154,7 @@ export class ProductService {
         select: {
           id: true,
           title: true,
-          ingredients: true,
+          description: true, // ✅ CORRECTION: utiliser description
           category: true
         }
       });
@@ -170,7 +166,7 @@ export class ProductService {
       const newScore = await this.ecoScoreService.calculate({
         id: product.id,
         title: product.title,
-        ingredients: product.ingredients || '',
+        ingredients: product.description || '', // ✅ CORRECTION: utiliser description
         category: product.category || ''
       });
       

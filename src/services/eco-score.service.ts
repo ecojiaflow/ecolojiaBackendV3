@@ -275,11 +275,11 @@ export class EcoScoreService {
     }
   }
 
-  private getConfidenceColor(confidence: number): string {
-    // ✅ CORRECTION: Retourner string au lieu d'enum
-    if (confidence >= 0.8) return 'green';
-    if (confidence >= 0.6) return 'yellow';
-    return 'red';
+  private getConfidenceColor(confidence: number): any {
+    // ✅ CORRECTION: Retourner objet compatible avec Prisma
+    if (confidence >= 0.8) return { set: 'green' };
+    if (confidence >= 0.6) return { set: 'yellow' };
+    return { set: 'red' };
   }
 
   async getProductScore(productId: string): Promise<EcoScoreResult | null> {
@@ -290,7 +290,7 @@ export class EcoScoreService {
           eco_score: true,
           ai_confidence: true,
           title: true,
-          ingredients: true,
+          description: true, // ✅ CORRECTION: utiliser description
           category: true
         }
       });
@@ -302,15 +302,15 @@ export class EcoScoreService {
         return await this.calculate({
           id: productId,
           title: product.title,
-          ingredients: product.ingredients || '',
+          ingredients: product.description || '', // ✅ CORRECTION: utiliser description
           category: product.category || ''
         });
       }
       
       // Retourner le score existant
       return {
-        eco_score: product.eco_score,
-        ai_confidence: product.ai_confidence || 0.7,
+        eco_score: Number(product.eco_score), // ✅ CORRECTION: convertir Decimal en number
+        ai_confidence: Number(product.ai_confidence || 0.7), // ✅ CORRECTION: convertir Decimal
         breakdown: {
           ingredients: 0,
           packaging: 0,
@@ -341,7 +341,7 @@ export class EcoScoreService {
         select: {
           id: true,
           title: true,
-          ingredients: true,
+          description: true, // ✅ CORRECTION: utiliser description
           category: true
         }
       });
@@ -355,7 +355,7 @@ export class EcoScoreService {
           const score = await this.calculate({
             id: product.id,
             title: product.title,
-            ingredients: product.ingredients || '',
+            ingredients: product.description || '', // ✅ CORRECTION: utiliser description
             category: product.category || ''
           });
           

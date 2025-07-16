@@ -75,7 +75,7 @@ export class DataOrchestrator {
           updated_at: {
             lt: thirtyDaysAgo
           },
-          verified_status: 'pending'
+          verified_status: 'verified' // ✅ CORRECTION: utiliser valeur enum valide
         }
       });
       
@@ -93,7 +93,7 @@ export class DataOrchestrator {
         select: {
           id: true,
           title: true,
-          ingredients: true,
+          description: true, // ✅ CORRECTION: utiliser description au lieu de ingredients
           category: true
         }
       });
@@ -105,7 +105,7 @@ export class DataOrchestrator {
           const score = await this.ecoScoreService.calculate({
             id: product.id,
             title: product.title,
-            ingredients: product.ingredients || '',
+            ingredients: product.description || '', // ✅ CORRECTION: utiliser description
             category: product.category || ''
           });
           
