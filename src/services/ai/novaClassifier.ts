@@ -71,7 +71,12 @@ class NovaClassifier {
     ];
   }
 
-  classifyProduct(product: { ingredients: string[] | string }) {
+  // ✅ MÉTHODE CLASSIFY AJOUTÉE (alias pour classifyProduct)
+  async classify(product: { title: string; ingredients: string[] | string }) {
+    return this.classifyProduct(product);
+  }
+
+  classifyProduct(product: { title?: string; ingredients: string[] | string }) {
     const analysis = this.analyzeIngredients(product.ingredients || []);
     const novaGroup = this.determineNovaGroup(analysis);
 

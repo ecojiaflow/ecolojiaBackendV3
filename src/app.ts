@@ -1,22 +1,25 @@
 // PATH: backend/src/app.ts
 import express from 'express';
 import cors from 'cors';
-import bodyParser from 'body-parser';
+import helmet from 'helmet';
+import dotenv from 'dotenv';
 
-import healthRoutes from './routes/health.routes';
-import chatRoutes from './routes/chat.routes';
-import multiCategoryRoutes from './routes/multiCategory.routes';
-import ultraProcessingRoutes from './routes/ultraProcessing.routes'; // ✅ IMPORT AJOUTÉ
+import productRoutes from './routes/product.routes';
+
+dotenv.config();
 
 const app = express();
 
 app.use(cors());
-app.use(bodyParser.json());
+app.use(helmet());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.use('/api/health', healthRoutes);
-app.use('/api/chat', chatRoutes);
-app.use('/api/multi-category', multiCategoryRoutes);
-app.use('/api/ultra-processing', ultraProcessingRoutes); // ✅ ROUTE AJOUTÉE
+app.get('/api/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', message: 'Ecolojia backend API running.' });
+});
+
+app.use('/api/products', productRoutes);
 
 export default app;
 // EOF
