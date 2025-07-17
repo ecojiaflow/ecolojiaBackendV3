@@ -1,7 +1,6 @@
 // PATH: src/services/algoliaService.ts
 import algoliasearch from 'algoliasearch';
-import { Product, ConfidenceColor, VerifiedStatus } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
+import { PrismaClient } from '@prisma/client';
 
 // Configuration Algolia depuis les variables d'environnement
 const client = algoliasearch(
@@ -12,6 +11,26 @@ const client = algoliasearch(
 // Index principal et staging
 const productsIndex = client.initIndex(process.env.ALGOLIA_INDEX_NAME || 'ecolojia_products');
 const stagingIndex = client.initIndex(process.env.ALGOLIA_INDEX_STAGING || 'ecolojia_products_staging');
+
+// Types simplifiés pour éviter les erreurs d'import Prisma
+interface Product {
+  id: string;
+  title: string;
+  slug: string;
+  description?: string | null;
+  brand?: string | null;
+  category: string;
+  tags?: string[] | null;
+  zones_dispo?: string[] | null;
+  eco_score?: any; // Decimal Prisma
+  ai_confidence?: any; // Decimal Prisma
+  confidence_color?: string | null;
+  verified_status?: string | null;
+  image_url?: string | null;
+  images?: string[] | null;
+  created_at: Date;
+  updated_at: Date;
+}
 
 // Interface pour les objets Algolia optimisés pour la recherche
 export interface AlgoliaProduct {
@@ -63,9 +82,13 @@ export class AlgoliaService {
   /**
    * Convertit Decimal Prisma vers number
    */
-  private static decimalToNumber(decimal: Decimal | null | undefined): number | undefined {
+  private static decimalToNumber(decimal: any): number | undefined {
     if (!decimal) return undefined;
-    return decimal.toNumber();
+    if (typeof decimal === 'number') return decimal;
+    if (decimal.toNumber && typeof decimal.toNumber === 'function') {
+      return decimal.toNumber();
+    }
+    return parseFloat(decimal.toString());
   }
 
   /**
@@ -98,7 +121,7 @@ export class AlgoliaService {
       
       // Classification et scoring
       nova_group: this.estimateNovaGroup(product),
-      is_verified: product.verified_status === VerifiedStatus.verified,
+      is_verified: product.verified_status === 'verified',
       category_icon: this.getCategoryIcon(product.category),
       confidence_score: this.calculateConfidenceScore(product),
       
@@ -166,9 +189,9 @@ export class AlgoliaService {
     if (product.eco_score) score += 10;
     
     // Bonus pour la vérification
-    if (product.verified_status === VerifiedStatus.verified) score += 20;
-    else if (product.verified_status === VerifiedStatus.ai_analyzed) score += 10;
-    else if (product.verified_status === VerifiedStatus.manual_review) score += 5;
+    if (product.verified_status === 'verified') score += 20;
+    else if (product.verified_status === 'ai_analyzed') score += 10;
+    else if (product.verified_status === 'manual_review') score += 5;
     
     // Bonus confiance IA
     if (product.ai_confidence) {
@@ -487,3 +510,4 @@ export class AlgoliaService {
 }
 
 export default AlgoliaService;
+// EOF

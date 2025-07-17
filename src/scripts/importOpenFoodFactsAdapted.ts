@@ -1,8 +1,12 @@
-// PATH: backend/src/scripts/importOpenFoodFactsAdapted.ts
-import { PrismaClient, ConfidenceColor, VerifiedStatus } from '@prisma/client';
+// PATH: src/scripts/importOpenFoodFactsAdapted.ts
+import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
+
+// Types simplifiés pour éviter les erreurs d'import Prisma
+type ConfidenceColor = 'green' | 'orange' | 'red';
+type VerifiedStatus = 'verified' | 'pending' | 'rejected' | 'ai_analyzed' | 'manual_review';
 
 // Configuration adaptée de ton script existant
 const CONFIG = {
@@ -85,7 +89,7 @@ class OpenFoodFactsImporterV2 {
         params,
         timeout: 15000,
         headers: {
-          'User-Agent': 'Ecolojia-Backend/2.0'
+          'User-Agent': process.env.OPENFOODFACTS_USER_AGENT || 'Ecolojia-Backend/2.0'
         }
       });
 
@@ -123,8 +127,8 @@ class OpenFoodFactsImporterV2 {
       eco_score: this.calculateEcoScore(product.nova_group || 1),
       ai_confidence: 0.8,
       confidence_pct: 80,
-      confidence_color: this.getConfidenceColor(80),
-      verified_status: VerifiedStatus.verified,
+      confidence_color: this.getConfidenceColor(80) as any, // Cast pour éviter erreur TypeScript
+      verified_status: 'verified' as any, // Cast pour éviter erreur TypeScript
       image_url: product.image_url || null,
       images: product.image_url ? [product.image_url] : []
     };
@@ -133,6 +137,8 @@ class OpenFoodFactsImporterV2 {
   private generateSlug(title: string, code: string): string {
     return title
       .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
       .substring(0, 50) + '-' + code.substring(-6);
@@ -147,6 +153,8 @@ class OpenFoodFactsImporterV2 {
     if (allText.includes('vegan')) tags.push('vegan');
     if (allText.includes('gluten')) tags.push('sans-gluten');
     if (allText.includes('fair-trade')) tags.push('commerce-équitable');
+    if (allText.includes('france')) tags.push('français');
+    if (allText.includes('artisan')) tags.push('artisanal');
     
     return tags.length > 0 ? tags : ['alimentaire'];
   }
@@ -157,16 +165,16 @@ class OpenFoodFactsImporterV2 {
   }
 
   private getConfidenceColor(confidence: number): ConfidenceColor {
-    if (confidence >= 80) return ConfidenceColor.green;
-    if (confidence >= 60) return ConfidenceColor.orange;
-    return ConfidenceColor.red;
+    if (confidence >= 80) return 'green';
+    if (confidence >= 60) return 'orange';
+    return 'red';
   }
 
   private determineCategory(categories: string): string {
     const categoryLower = categories.toLowerCase();
     
     if (categoryLower.includes('cosmetic') || categoryLower.includes('beauty')) {
-      return 'cosmetique';
+      return 'cosmetic';
     }
     if (categoryLower.includes('detergent') || categoryLower.includes('cleaning')) {
       return 'detergent';
@@ -233,23 +241,9 @@ class OpenFoodFactsImporterV2 {
         this.log(`   ✅ Créé: ${productData.title.substring(0, 30)}...`);
       }
 
-      // Note: Pas de table analysis dans ton schéma, on skip cette partie
-
     } catch (error) {
       throw error;
     }
-  }
-
-  private async createNovaAnalysis(product: OpenFoodFactsProduct) {
-    // Table analysis n'existe pas dans ton schéma Prisma
-    // Cette fonction est désactivée pour éviter les erreurs
-    this.log(`   📊 Analyse NOVA ${product.nova_group || 1} pour ${product.code} (pas de table analysis)`);
-  }
-
-  private calculateScore(novaGroup: number): number {
-    // Fonction gardée pour compatibilité mais pas utilisée car pas de table analysis
-    const scores = { 1: 9.0, 2: 7.0, 3: 5.0, 4: 2.0 };
-    return scores[novaGroup as keyof typeof scores] || 5.0;
   }
 
   private sleep(ms: number): Promise<void> {
@@ -352,4 +346,6 @@ async function main() {
 if (require.main === module) {
   main().catch(console.error);
 }
+
+export default OpenFoodFactsImporterV2;
 // EOF

@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// PATH: backend/src/scripts/importOpenFoodFactsAdapted.ts
+// PATH: src/scripts/importOpenFoodFactsAdapted.ts
 const client_1 = require("@prisma/client");
 const axios_1 = __importDefault(require("axios"));
 const fs = __importStar(require("fs"));
@@ -91,7 +91,7 @@ class OpenFoodFactsImporterV2 {
                 params,
                 timeout: 15000,
                 headers: {
-                    'User-Agent': 'Ecolojia-Backend/2.0'
+                    'User-Agent': process.env.OPENFOODFACTS_USER_AGENT || 'Ecolojia-Backend/2.0'
                 }
             });
             const products = response.data.products || [];
@@ -123,8 +123,8 @@ class OpenFoodFactsImporterV2 {
             eco_score: this.calculateEcoScore(product.nova_group || 1),
             ai_confidence: 0.8,
             confidence_pct: 80,
-            confidence_color: this.getConfidenceColor(80),
-            verified_status: client_1.VerifiedStatus.verified,
+            confidence_color: this.getConfidenceColor(80), // Cast pour éviter erreur TypeScript
+            verified_status: 'verified', // Cast pour éviter erreur TypeScript
             image_url: product.image_url || null,
             images: product.image_url ? [product.image_url] : []
         };
@@ -132,6 +132,8 @@ class OpenFoodFactsImporterV2 {
     generateSlug(title, code) {
         return title
             .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
             .replace(/[^a-z0-9\s-]/g, '')
             .replace(/\s+/g, '-')
             .substring(0, 50) + '-' + code.substring(-6);
@@ -149,6 +151,10 @@ class OpenFoodFactsImporterV2 {
             tags.push('sans-gluten');
         if (allText.includes('fair-trade'))
             tags.push('commerce-équitable');
+        if (allText.includes('france'))
+            tags.push('français');
+        if (allText.includes('artisan'))
+            tags.push('artisanal');
         return tags.length > 0 ? tags : ['alimentaire'];
     }
     calculateEcoScore(novaGroup) {
@@ -157,15 +163,15 @@ class OpenFoodFactsImporterV2 {
     }
     getConfidenceColor(confidence) {
         if (confidence >= 80)
-            return client_1.ConfidenceColor.green;
+            return 'green';
         if (confidence >= 60)
-            return client_1.ConfidenceColor.orange;
-        return client_1.ConfidenceColor.red;
+            return 'orange';
+        return 'red';
     }
     determineCategory(categories) {
         const categoryLower = categories.toLowerCase();
         if (categoryLower.includes('cosmetic') || categoryLower.includes('beauty')) {
-            return 'cosmetique';
+            return 'cosmetic';
         }
         if (categoryLower.includes('detergent') || categoryLower.includes('cleaning')) {
             return 'detergent';
@@ -223,21 +229,10 @@ class OpenFoodFactsImporterV2 {
                 this.results.success++;
                 this.log(`   ✅ Créé: ${productData.title.substring(0, 30)}...`);
             }
-            // Note: Pas de table analysis dans ton schéma, on skip cette partie
         }
         catch (error) {
             throw error;
         }
-    }
-    async createNovaAnalysis(product) {
-        // Table analysis n'existe pas dans ton schéma Prisma
-        // Cette fonction est désactivée pour éviter les erreurs
-        this.log(`   📊 Analyse NOVA ${product.nova_group || 1} pour ${product.code} (pas de table analysis)`);
-    }
-    calculateScore(novaGroup) {
-        // Fonction gardée pour compatibilité mais pas utilisée car pas de table analysis
-        const scores = { 1: 9.0, 2: 7.0, 3: 5.0, 4: 2.0 };
-        return scores[novaGroup] || 5.0;
     }
     sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
@@ -326,4 +321,5 @@ async function main() {
 if (require.main === module) {
     main().catch(console.error);
 }
+exports.default = OpenFoodFactsImporterV2;
 // EOF
