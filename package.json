@@ -1,4 +1,3 @@
-// PATH: backend/package.json
 {
   "name": "ecolojia-backend",
   "version": "0.1.0",
@@ -87,4 +86,3 @@
     "forceExit": true
   }
 }
-// EOF
