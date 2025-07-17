@@ -5,9 +5,10 @@
   "description": "API backend for Ecolojia - Node.js + Express + Prisma + Algolia",
   "main": "dist/server.js",
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=18.18.0",
     "npm": ">=8.0.0"
   },
+  "engineStrict": true,
   "scripts": {
     "dev": "node dist/server.js",
     "build": "tsc",
