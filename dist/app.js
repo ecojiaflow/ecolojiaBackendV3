@@ -12,6 +12,8 @@ const product_routes_1 = __importDefault(require("./routes/product.routes"));
 const scan_routes_1 = __importDefault(require("./routes/scan.routes"));
 const cosmetic_routes_1 = __importDefault(require("./routes/cosmetic.routes"));
 const detergent_routes_1 = __importDefault(require("./routes/detergent.routes"));
+// Nouvelle route admin
+const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
@@ -32,7 +34,8 @@ app.get('/', (req, res) => {
             '🧽 Impact environnemental détergents',
             '🔍 Recherche OpenFoodFacts',
             '🎯 Détection automatique catégories',
-            '📊 Sources scientifiques INSERM/EFSA 2024'
+            '📊 Sources scientifiques INSERM/EFSA 2024',
+            '⚙️ Interface admin monitoring imports'
         ],
         endpoints: {
             health: '/api/health',
@@ -42,6 +45,12 @@ app.get('/', (req, res) => {
             products: {
                 analyze: 'POST /api/products/analyze',
                 status: 'GET /api/products/status'
+            },
+            admin: {
+                dashboard: 'GET /api/admin/dashboard',
+                recent_products: 'GET /api/admin/recent-products',
+                import_logs: 'GET /api/admin/import-logs',
+                trigger_import: 'POST /api/admin/trigger-import'
             }
         },
         documentation: 'https://docs.ecolojia.com',
@@ -52,23 +61,26 @@ app.get('/', (req, res) => {
 app.get('/api/health', (_req, res) => {
     res.status(200).json({
         status: 'ok',
-        message: 'Ecolojia backend API running with scanner + multi-category analysis.',
+        message: 'Ecolojia backend API running with scanner + multi-category analysis + admin monitoring.',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         services: {
             scanner: 'active',
             cosmetic_analyzer: 'active',
             detergent_analyzer: 'active',
-            openfoodfacts: 'active'
+            openfoodfacts: 'active',
+            admin_dashboard: 'active',
+            import_monitoring: 'active'
         }
     });
 });
 // Routes existantes
 app.use('/api/products', product_routes_1.default);
-// Nouvelles routes
 app.use('/api/scan', scan_routes_1.default);
 app.use('/api/cosmetic', cosmetic_routes_1.default);
 app.use('/api/detergent', detergent_routes_1.default);
+// Nouvelle route admin
+app.use('/api/admin', admin_routes_1.default);
 // ✅ ROUTE 404 MISE À JOUR
 app.use('*', (req, res) => {
     res.status(404).json({
@@ -81,7 +93,11 @@ app.use('*', (req, res) => {
             'POST /api/cosmetic/analyze',
             'POST /api/detergent/analyze',
             'POST /api/products/analyze',
-            'GET /api/products/status'
+            'GET /api/products/status',
+            'GET /api/admin/dashboard',
+            'GET /api/admin/recent-products',
+            'GET /api/admin/import-logs',
+            'POST /api/admin/trigger-import'
         ],
         timestamp: new Date().toISOString()
     });

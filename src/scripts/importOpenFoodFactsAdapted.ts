@@ -1,5 +1,5 @@
 // PATH: backend/src/scripts/importOpenFoodFactsAdapted.ts
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, ConfidenceColor, VerifiedStatus } from '@prisma/client';
 import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -108,15 +108,58 @@ class OpenFoodFactsImporterV2 {
 
   // Adaptation de ta logique de transformation pour Prisma
   private transformForDatabase(product: OpenFoodFactsProduct) {
+    const title = product.product_name?.trim() || `Produit ${product.code}`;
+    const slug = this.generateSlug(title, product.code);
+    
     return {
-      barcode: product.code,
-      name: product.product_name?.trim() || `Produit ${product.code}`,
+      title: title,
+      slug: slug,
+      description: product.ingredients_text?.substring(0, 500) || `Produit alimentaire référencé OpenFoodFacts`,
       brand: product.brands ? product.brands.split(',')[0].trim() : null,
       category: this.determineCategory(product.categories || ''),
-      ingredients: product.ingredients_text || null,
-      nutrition: product.nutriments ? JSON.parse(JSON.stringify(product.nutriments)) : null,
-      image_url: product.image_url || null
+      tags: this.extractTags(product.categories || '', product.labels || ''),
+      zones_dispo: ['FR'], // Produits français par défaut
+      affiliate_url: `https://world.openfoodfacts.org/product/${product.code}`,
+      eco_score: this.calculateEcoScore(product.nova_group || 1),
+      ai_confidence: 0.8,
+      confidence_pct: 80,
+      confidence_color: this.getConfidenceColor(80),
+      verified_status: VerifiedStatus.verified,
+      image_url: product.image_url || null,
+      images: product.image_url ? [product.image_url] : []
     };
+  }
+
+  private generateSlug(title: string, code: string): string {
+    return title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .substring(0, 50) + '-' + code.substring(-6);
+  }
+
+  private extractTags(categories: string, labels: string): string[] {
+    const tags = [];
+    const allText = (categories + ' ' + labels).toLowerCase();
+    
+    if (allText.includes('bio')) tags.push('bio');
+    if (allText.includes('organic')) tags.push('bio');
+    if (allText.includes('vegan')) tags.push('vegan');
+    if (allText.includes('gluten')) tags.push('sans-gluten');
+    if (allText.includes('fair-trade')) tags.push('commerce-équitable');
+    
+    return tags.length > 0 ? tags : ['alimentaire'];
+  }
+
+  private calculateEcoScore(novaGroup: number): number {
+    const scores = { 1: 0.9, 2: 0.7, 3: 0.5, 4: 0.3 };
+    return scores[novaGroup as keyof typeof scores] || 0.5;
+  }
+
+  private getConfidenceColor(confidence: number): ConfidenceColor {
+    if (confidence >= 80) return ConfidenceColor.green;
+    if (confidence >= 60) return ConfidenceColor.orange;
+    return ConfidenceColor.red;
   }
 
   private determineCategory(categories: string): string {
@@ -162,9 +205,10 @@ class OpenFoodFactsImporterV2 {
 
   private async importSingleProduct(product: OpenFoodFactsProduct) {
     try {
-      // Vérifier si produit existe
+      // Vérifier si produit existe déjà par slug
+      const slug = this.generateSlug(product.product_name || `Produit ${product.code}`, product.code);
       const existingProduct = await this.prisma.product.findUnique({
-        where: { barcode: product.code }
+        where: { slug: slug }
       });
 
       const productData = this.transformForDatabase(product);
@@ -179,20 +223,17 @@ class OpenFoodFactsImporterV2 {
           }
         });
         this.results.updated++;
-        this.log(`   🔄 Mis à jour: ${productData.name.substring(0, 30)}...`);
+        this.log(`   🔄 Mis à jour: ${productData.title.substring(0, 30)}...`);
       } else {
         // Création
         await this.prisma.product.create({
           data: productData
         });
         this.results.success++;
-        this.log(`   ✅ Créé: ${productData.name.substring(0, 30)}...`);
+        this.log(`   ✅ Créé: ${productData.title.substring(0, 30)}...`);
       }
 
-      // Créer analyse NOVA si disponible
-      if (product.nova_group) {
-        await this.createNovaAnalysis(product);
-      }
+      // Note: Pas de table analysis dans ton schéma, on skip cette partie
 
     } catch (error) {
       throw error;
@@ -200,33 +241,13 @@ class OpenFoodFactsImporterV2 {
   }
 
   private async createNovaAnalysis(product: OpenFoodFactsProduct) {
-    try {
-      const existingAnalysis = await this.prisma.analysis.findFirst({
-        where: { barcode: product.code }
-      });
-
-      if (!existingAnalysis) {
-        await this.prisma.analysis.create({
-          data: {
-            barcode: product.code,
-            category: 'alimentaire',
-            nova_group: product.nova_group || 1,
-            risk_factors: [],
-            score: this.calculateScore(product.nova_group || 1),
-            confidence: 0.8,
-            metadata: {
-              source: 'openfoodfacts_import_v2',
-              import_date: new Date().toISOString()
-            }
-          }
-        });
-      }
-    } catch (error) {
-      this.log(`⚠️ Erreur analyse NOVA ${product.code}: ${error}`, 'ERROR');
-    }
+    // Table analysis n'existe pas dans ton schéma Prisma
+    // Cette fonction est désactivée pour éviter les erreurs
+    this.log(`   📊 Analyse NOVA ${product.nova_group || 1} pour ${product.code} (pas de table analysis)`);
   }
 
   private calculateScore(novaGroup: number): number {
+    // Fonction gardée pour compatibilité mais pas utilisée car pas de table analysis
     const scores = { 1: 9.0, 2: 7.0, 3: 5.0, 4: 2.0 };
     return scores[novaGroup as keyof typeof scores] || 5.0;
   }
