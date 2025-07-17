@@ -1,3 +1,4 @@
+// PATH: backend/package.json
 {
   "name": "ecolojia-backend",
   "version": "0.1.0",
@@ -7,7 +8,7 @@
   "scripts": {
     "dev": "node dist/server.js",
     "build": "tsc",
-    "postbuild": "if not exist dist\\data mkdir dist\\data && if exist src\\data\\educational-insights-db.json copy src\\data\\educational-insights-db.json dist\\data\\educational-insights-db.json >nul 2>&1",
+    "postbuild": "",
     "start": "node dist/server.js",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -86,3 +87,4 @@
     "forceExit": true
   }
 }
+// EOF
