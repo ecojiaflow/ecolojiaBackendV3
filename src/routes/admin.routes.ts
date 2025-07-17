@@ -1,147 +1,87 @@
 // PATH: backend/src/routes/admin.routes.ts
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
-import * as fs from 'fs';
-import * as path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
-// Dashboard admin - statistiques imports
-router.get('/dashboard', async (req, res) => {
-  try {
-    const stats = await Promise.all([
-      prisma.product.count(),
-      prisma.product.count({ where: { verified_status: 'verified' } }),
-      prisma.product.count({ where: { image_url: { not: null } } }),
-      prisma.product.groupBy({
-        by: ['category'],
-        _count: { category: true }
-      })
-    ]);
-
-    const [totalProducts, verifiedProducts, productsWithImages, categoryStats] = stats;
-
-    res.json({
-      success: true,
-      data: {
-        totalProducts,
-        verifiedProducts,
-        productsWithImages,
-        categoryBreakdown: categoryStats,
-        lastUpdate: new Date().toISOString()
-      }
-    });
-
-  } catch (error) {
-    console.error('Erreur dashboard admin:', error);
-    res.status(500).json({
-      error: 'Erreur lors de la récupération des statistiques',
-      code: 'ADMIN_DASHBOARD_ERROR'
-    });
+// ─────────────────────────────────────────────
+// 🔁 Données simulées (temporaire)
+// ─────────────────────────────────────────────
+const logs = [
+  {
+    id: uuidv4(),
+    timestamp: new Date().toISOString(),
+    status: 'success',
+    productsProcessed: 25,
+    productsSuccess: 23,
+    productsFailed: 2,
+    duration: 63,
+    fileName: 'openfood-2025-07-17.json.gz'
   }
-});
+];
 
-// Logs d'import récents
-router.get('/import-logs', async (req, res) => {
-  try {
-    const logsDir = path.join(__dirname, '../../logs');
-    
-    if (!fs.existsSync(logsDir)) {
-      return res.json({ success: true, data: { logs: [], message: 'Aucun log disponible' } });
+const products = [...Array(10)].map((_, i) => ({
+  id: uuidv4(),
+  title: `Produit ${i + 1}`,
+  slug: `produit-${i + 1}`,
+  category: ['alimentaire', 'cosmetic', 'detergent'][i % 3],
+  brand: 'Marque Démo',
+  eco_score: Math.floor(Math.random() * 100),
+  ai_confidence: Math.floor(Math.random() * 20 + 70),
+  confidence_color: ['green', 'orange', 'red'][i % 3] as 'green' | 'orange' | 'red',
+  verified_status: 'pending',
+  created_at: new Date().toISOString(),
+  image_url: 'https://via.placeholder.com/64'
+}));
+
+// ─────────────────────────────────────────────
+// 📊 /dashboard
+// ─────────────────────────────────────────────
+router.get('/dashboard', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      totalProducts: 10421,
+      totalImports: 19,
+      lastImportDate: new Date().toISOString(),
+      successRate: 92.5,
+      averageConfidence: 84.2,
+      productsByCategory: {
+        alimentaire: 8800,
+        cosmetic: 1021,
+        detergent: 600
+      },
+      recentActivity: [
+        { date: '2025-07-16', action: 'import', count: 2300 },
+        { date: '2025-07-15', action: 'scan', count: 112 },
+        { date: '2025-07-14', action: 'delete', count: 7 }
+      ]
     }
-
-    const logFiles = fs.readdirSync(logsDir)
-      .filter(file => file.startsWith('import-results-'))
-      .sort((a, b) => b.localeCompare(a))
-      .slice(0, 10);
-
-    const logs = logFiles.map(file => {
-      try {
-        const content = JSON.parse(fs.readFileSync(path.join(logsDir, file), 'utf8'));
-        return {
-          filename: file,
-          timestamp: content.timestamp,
-          results: content.results,
-          config: content.config
-        };
-      } catch (error) {
-        return null;
-      }
-    }).filter(log => log !== null);
-
-    res.json({
-      success: true,
-      data: { logs }
-    });
-
-  } catch (error) {
-    console.error('Erreur logs import:', error);
-    res.status(500).json({
-      error: 'Erreur lors de la récupération des logs',
-      code: 'IMPORT_LOGS_ERROR'
-    });
-  }
+  });
 });
 
-// Produits récents
-router.get('/recent-products', async (req, res) => {
-  try {
-    const limit = parseInt(req.query.limit as string) || 20;
-    
-    const recentProducts = await prisma.product.findMany({
-      orderBy: { created_at: 'desc' },
-      take: limit,
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        brand: true,
-        category: true,
-        eco_score: true,
-        confidence_color: true,
-        verified_status: true,
-        image_url: true,
-        created_at: true
-      }
-    });
-
-    res.json({
-      success: true,
-      data: { products: recentProducts }
-    });
-
-  } catch (error) {
-    console.error('Erreur produits récents:', error);
-    res.status(500).json({
-      error: 'Erreur lors de la récupération des produits',
-      code: 'RECENT_PRODUCTS_ERROR'
-    });
-  }
+// ─────────────────────────────────────────────
+// 📦 /recent-products
+// ─────────────────────────────────────────────
+router.get('/recent-products', (req, res) => {
+  const limit = parseInt(req.query.limit as string) || 10;
+  res.json({ success: true, data: products.slice(0, limit) });
 });
 
-// Déclencher nouvel import
-router.post('/trigger-import', async (req, res) => {
-  try {
-    const { maxProducts = 50 } = req.body;
+// ─────────────────────────────────────────────
+// 📄 /import-logs
+// ─────────────────────────────────────────────
+router.get('/import-logs', (req, res) => {
+  res.json({ success: true, data: logs });
+});
 
-    // Import en arrière-plan (ne pas bloquer la réponse)
-    res.json({
-      success: true,
-      message: `Import de ${maxProducts} produits déclenché`,
-      timestamp: new Date().toISOString()
-    });
-
-    // TODO: Déclencher import en arrière-plan
-    console.log(`🚀 Import de ${maxProducts} produits déclenché via API`);
-
-  } catch (error) {
-    console.error('Erreur déclenchement import:', error);
-    res.status(500).json({
-      error: 'Erreur lors du déclenchement de l\'import',
-      code: 'TRIGGER_IMPORT_ERROR'
-    });
-  }
+// ─────────────────────────────────────────────
+// 🚀 /trigger-import
+// ─────────────────────────────────────────────
+router.post('/trigger-import', (req, res) => {
+  const importId = uuidv4();
+  console.log(`🧠 Simulation import déclenchée ID: ${importId}`);
+  res.json({ success: true, data: { message: 'Import simulé lancé', importId } });
 });
 
 export default router;
