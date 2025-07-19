@@ -1,11 +1,12 @@
 // 📝 FICHIER COMPLET CORRIGÉ : src/routes/analyze.routes.js
-// Avec intégration Auto-Détection COMPLÈTE + FIX foodScorer
+// Avec intégration Auto-Détection COMPLÈTE + FIX foodScorer + Ultra-Transformation
 
 const { Router } = require('express');
 const foodScorer = require('../scorers/food/foodScorer');
 const CosmeticScorer = require('../scorers/cosmetic/cosmeticScorer');
 const { DetergentScorer } = require('../scorers/detergent/detergentScorer');
 const { ProductTypeDetector } = require('../services/ai/productTypeDetector'); // ✨ NOUVEAU
+const { detectUltraTransformation } = require('./ultraProcessing.routes'); // ✨ ULTRA-TRANSFORMATION
 
 const router = Router();
 const cosmeticScorer = new CosmeticScorer();
@@ -584,6 +585,90 @@ router.post('/detergent', async (req, res) => {
 });
 
 /**
+ * 🔬 POST /analyze/ultra-transform
+ * Analyse du niveau d'ultra-transformation
+ */
+router.post('/ultra-transform', async (req, res) => {
+  try {
+    console.log('🔬 Requête analyse Ultra-Transformation reçue:', req.body);
+
+    const { product_name, ingredients, productName } = req.body;
+    const name = product_name || productName;
+    
+    if (!name?.trim() || !ingredients?.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Données insuffisantes',
+        message: 'Le nom du produit et les ingrédients sont requis'
+      });
+    }
+
+    // Convertir les ingrédients en tableau si nécessaire
+    let ingredientsArray = ingredients;
+    if (typeof ingredients === 'string') {
+      ingredientsArray = ingredients.split(',').map(i => i.trim());
+    }
+
+    // Utiliser la fonction existante
+    const ultraResult = detectUltraTransformation(ingredientsArray);
+
+    // Enrichir le résultat pour le frontend
+    const result = {
+      productName: name,
+      transformationLevel: ultraResult.level === 'sévère' ? 4 : 
+                          ultraResult.level === 'modéré' ? 3 : 2,
+      processingMethods: ultraResult.detected || [],
+      industrialMarkers: (ultraResult.detected || []).map(d => `Marqueur détecté: ${d}`),
+      nutritionalImpact: {
+        vitaminLoss: ultraResult.score * 0.8,
+        mineralRetention: 100 - (ultraResult.score * 0.3),
+        proteinDenaturation: ultraResult.score * 0.5,
+        fiberDegradation: ultraResult.score * 0.4,
+        antioxidantLoss: ultraResult.score * 0.7,
+        glycemicIndexIncrease: ultraResult.score * 0.3,
+        neoformedCompounds: ultraResult.level === 'sévère' ? 'high' : 
+                           ultraResult.level === 'modéré' ? 'medium' : 'low',
+        bioavailabilityImpact: ultraResult.level === 'sévère' ? 'negative' : 'neutral'
+      },
+      recommendations: [
+        ultraResult.level === 'sévère' ? '🚨 Ultra-transformation détectée - limiter la consommation' :
+        ultraResult.level === 'modéré' ? '⚠️ Transformation importante - consommation modérée' :
+        '✅ Transformation acceptable',
+        ultraResult.justification || 'Analyse basée sur les ingrédients fournis'
+      ],
+      naturalityMatrix: {
+        naturalIngredients: ingredientsArray.length - (ultraResult.detected?.length || 0),
+        artificialIngredients: ultraResult.detected?.length || 0,
+        processingAids: 0,
+        naturalityScore: Math.max(0, 100 - (ultraResult.score || 0))
+      },
+      confidence: 0.8,
+      scientificSources: ultraResult.sources || ['NOVA 2019', 'INSERM 2024', 'SIGA 2024'],
+      // Compatibilité avec le composant simplifié
+      novaClass: ultraResult.level === 'sévère' ? 4 : 
+                 ultraResult.level === 'modéré' ? 3 : 2,
+      transformationScore: ultraResult.score || 0,
+      additivesCount: ultraResult.detected?.length || 0
+    };
+
+    res.json({
+      success: true,
+      type: 'ultra_transformation',
+      analysis: result,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Erreur analyse Ultra-Transformation:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur interne du serveur',
+      message: error.message
+    });
+  }
+});
+
+/**
  * GET /analyze/health
  * Vérifie état du service
  */
@@ -591,22 +676,25 @@ router.get('/health', (req, res) => {
   res.json({
     success: true,
     service: 'ECOLOJIA Scoring Engine',
-    version: '4.0-auto-detection-fixed',
+    version: '4.1-ultra-transformation-auto-detection-fixed',
     features: {
       food: ['NOVA', 'EFSA', 'NutriScore', 'IG', 'Alternatives IA', 'Insights IA', 'Chat IA'],
       cosmetic: ['INCI Analysis', 'Endocrine Disruptors', 'Allergens', 'Benefit Evaluation'],
       detergent: ['REACH Analysis', 'Ecotoxicity', 'Biodegradability', 'EU Ecolabel'],
-      auto_detection: ['Smart Type Detection', 'Multi-Product Analysis', 'Unified Endpoint']
+      auto_detection: ['Smart Type Detection', 'Multi-Product Analysis', 'Unified Endpoint'],
+      ultra_transformation: ['Processing Detection', 'Nutritional Impact', 'Naturality Matrix']
     },
     endpoints: [
       'POST /analyze/food',
       'POST /analyze/cosmetic',
       'POST /analyze/detergent',
-      'POST /analyze/auto'
+      'POST /analyze/auto',
+      'POST /analyze/ultra-transform'
     ],
     status: 'operational',
     foodScorer_methods: Object.getOwnPropertyNames(foodScorer).filter(name => typeof foodScorer[name] === 'function'),
-    fix_applied: 'foodScorer method detection with fallback'
+    fix_applied: 'foodScorer method detection with fallback + ultra-transformation integration',
+    timestamp: new Date().toISOString()
   });
 });
 
