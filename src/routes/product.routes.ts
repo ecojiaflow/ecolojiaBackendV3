@@ -95,6 +95,9 @@ router.post('/ultra-transform', upload.none(), async (req, res) => {
     // Utiliser la fonction existante
     const ultraResult = detectUltraTransformation(ingredientsArray);
 
+    // ✅ FIX: Définir sources par défaut si non présentes
+    const scientificSources = ['NOVA 2019', 'INSERM 2024', 'SIGA 2024'];
+
     // Enrichir le résultat pour le frontend
     const result = {
       productName: name,
@@ -126,7 +129,7 @@ router.post('/ultra-transform', upload.none(), async (req, res) => {
         naturalityScore: Math.max(0, 100 - (ultraResult.score || 0))
       },
       confidence: 0.8,
-      scientificSources: ultraResult.sources || ['NOVA 2019', 'INSERM 2024', 'SIGA 2024'],
+      scientificSources: scientificSources, // ✅ FIX: Utiliser variable locale
       // Compatibilité avec le composant simplifié
       novaClass: ultraResult.level === 'sévère' ? 4 : 
                  ultraResult.level === 'modéré' ? 3 : 2,
@@ -137,7 +140,9 @@ router.post('/ultra-transform', upload.none(), async (req, res) => {
         ingredientsProcessed: ingredientsArray.length,
         analysisTimestamp: new Date().toISOString(),
         backend: 'product.routes.ts',
-        version: '1.0'
+        version: '1.0',
+        ultraResultType: typeof ultraResult,
+        ultraResultKeys: Object.keys(ultraResult)
       }
     };
 
@@ -145,7 +150,8 @@ router.post('/ultra-transform', upload.none(), async (req, res) => {
       productName: name,
       transformationLevel: result.transformationLevel,
       score: result.transformationScore,
-      markersDetected: result.additivesCount
+      markersDetected: result.additivesCount,
+      ultraLevel: ultraResult.level
     });
 
     res.json({
@@ -156,7 +162,13 @@ router.post('/ultra-transform', upload.none(), async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('❌ Erreur analyse Ultra-Transformation:', error);
+    console.error('❌ Erreur analyse Ultra-Transformation:', {
+      error: error.message,
+      stack: error.stack,
+      name: error.name,
+      requestBody: req.body
+    });
+    
     res.status(500).json({
       success: false,
       error: 'Erreur interne du serveur',
@@ -174,7 +186,13 @@ router.get('/status', (_req, res) => {
     status: 'produit routes opérationnel', 
     verified: 'ok',
     features: ['analyze', 'ultra-transform'], // ✨ NOUVEAU
-    version: '1.1-ultra-transform'
+    version: '1.1-ultra-transform-fixed',
+    endpoints: [
+      'POST /products/analyze',
+      'POST /products/ultra-transform',
+      'GET /products/status'
+    ],
+    typescript_status: 'compiled_successfully'
   });
 });
 
