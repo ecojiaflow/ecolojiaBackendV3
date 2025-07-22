@@ -1,129 +1,216 @@
 "use strict";
-// 🔴 BACKEND - backend/src/auth/services/AuthService.ts
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AuthService = void 0;
-const bcrypt_1 = __importDefault(require("bcrypt"));
+exports.authService = exports.AuthService = void 0;
+// PATH: backend/src/auth/services/AuthService.ts
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const client_1 = require("@prisma/client");
+const prisma = new client_1.PrismaClient();
 class AuthService {
-    constructor(userRepository, sessionRepository, emailService, logger) {
-        this.userRepository = userRepository;
-        this.sessionRepository = sessionRepository;
-        this.emailService = emailService;
-        this.logger = logger;
+    constructor() {
+        this.jwtSecret = process.env.JWT_SECRET || 'ecolojia-jwt-secret-2024';
+        this.jwtExpiresIn = process.env.JWT_EXPIRES_IN || '7d';
     }
-    async register(registerData) {
-        this.logger.info('Starting user registration', { email: registerData.email });
+    /**
+     * Inscription utilisateur avec validation email
+     */
+    async register(registerData, sessionInfo) {
         try {
-            // 1. Validation
-            this.validateRegisterData(registerData);
-            // 2. Vérifier si email existe déjà
-            const existingUser = await this.userRepository.findByEmail(registerData.email);
+            // Vérifier si email existe déjà
+            const existingUser = await prisma.user.findUnique({
+                where: { email: registerData.email }
+            });
             if (existingUser) {
-                throw new AuthError('USER_ALREADY_EXISTS', 'Un compte existe déjà avec cet email');
+                return {
+                    success: false,
+                    message: 'Un compte existe déjà avec cet email'
+                };
             }
-            // 3. Hash password
-            const passwordHash = await bcrypt_1.default.hash(registerData.password, 12);
-            // 4. Créer utilisateur
-            const user = {
-                email: registerData.email.toLowerCase(),
-                passwordHash,
-                name: registerData.name,
-                tier: 'free',
-                emailVerified: false,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                preferences: {
-                    language: 'fr',
-                    notifications: true,
-                    darkMode: false
-                },
-                quotas: {
-                    scansPerMonth: 30,
-                    aiQuestionsPerDay: 5,
-                    exportsPerMonth: 0
-                },
-                currentUsage: {
-                    scansThisMonth: 0,
-                    aiQuestionsToday: 0,
-                    exportsThisMonth: 0,
-                    lastResetDate: new Date()
+            // Hash du mot de passe
+            const passwordHash = await bcryptjs_1.default.hash(registerData.password, 12);
+            // Créer utilisateur avec timestamps par défaut
+            const user = await prisma.user.create({
+                data: {
+                    email: registerData.email,
+                    passwordHash,
+                    name: registerData.name,
+                    tier: 'free',
+                    emailVerified: false,
+                    // ✅ Les timestamps sont gérés automatiquement par Prisma
+                    quotas: {
+                        scansPerMonth: 30,
+                        aiQuestionsPerDay: 0,
+                        exportsPerMonth: 0
+                    },
+                    currentUsage: {
+                        scansThisMonth: 0,
+                        aiQuestionsToday: 0,
+                        exportsThisMonth: 0
+                    }
                 }
-            };
-            const createdUser = await this.userRepository.create(user);
-            // 5. Générer token de vérification email
-            const verificationToken = this.generateVerificationToken(createdUser.id);
-            // 6. Envoyer email de vérification
-            await this.emailService.sendVerificationEmail(createdUser.email, createdUser.name, verificationToken);
-            this.logger.info('User registered successfully', {
-                userId: createdUser.id,
-                email: createdUser.email
             });
-            return {
-                success: true,
-                userId: createdUser.id,
-                message: 'Compte créé avec succès. Vérifiez votre email pour activer votre compte.'
-            };
-        }
-        catch (error) {
-            this.logger.error('Registration failed', {
-                email: registerData.email,
-                error: error.message
+            // Générer token JWT
+            const token = this.generateJWT(user.id, user.email);
+            const refreshToken = this.generateRefreshToken();
+            // Créer session avec timestamps par défaut
+            const session = await prisma.userSession.create({
+                data: {
+                    userId: user.id,
+                    token,
+                    refreshToken,
+                    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 jours
+                    // ✅ createdAt et isActive ont des valeurs par défaut dans Prisma
+                }
             });
-            throw error;
-        }
-    }
-    async login(loginData, sessionInfo) {
-        this.logger.info('Starting user login', { email: loginData.email });
-        try {
-            // 1. Validation
-            this.validateLoginData(loginData);
-            // 2. Trouver utilisateur
-            const user = await this.userRepository.findByEmail(loginData.email);
-            if (!user) {
-                throw new AuthError('INVALID_CREDENTIALS', 'Email ou mot de passe incorrect');
-            }
-            // 3. Vérifier mot de passe
-            const isPasswordValid = await bcrypt_1.default.compare(loginData.password, user.passwordHash);
-            if (!isPasswordValid) {
-                throw new AuthError('INVALID_CREDENTIALS', 'Email ou mot de passe incorrect');
-            }
-            // 4. Vérifier email vérifié
-            if (!user.emailVerified) {
-                throw new AuthError('EMAIL_NOT_VERIFIED', 'Veuillez vérifier votre email avant de vous connecter');
-            }
-            // 5. Créer session
-            const session = await this.createSession(user.id, sessionInfo);
-            // 6. Mettre à jour last login
-            await this.userRepository.updateLastLogin(user.id);
-            this.logger.info('User logged in successfully', {
-                userId: user.id,
-                sessionId: session.id
+            // Créer token de validation email
+            const emailToken = this.generateEmailValidationToken();
+            await prisma.emailVerification.create({
+                data: {
+                    userId: user.id,
+                    email: user.email,
+                    token: emailToken,
+                    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24h
+                }
             });
             return {
                 success: true,
                 user: this.sanitizeUser(user),
-                session: {
-                    token: session.token,
-                    refreshToken: session.refreshToken,
-                    expiresAt: session.expiresAt
-                }
+                token,
+                message: 'Inscription réussie. Vérifiez votre email pour activer votre compte.'
             };
         }
         catch (error) {
-            this.logger.error('Login failed', {
-                email: loginData.email,
-                error: error.message
-            });
-            throw error;
+            console.error('❌ Registration error:', error);
+            return {
+                success: false,
+                message: 'Erreur lors de l\'inscription'
+            };
         }
     }
-    // ... autres méthodes (verifyEmail, refreshToken, etc.)
-    // Copiez le reste depuis l'artifact "auth-backend-structure"
+    /**
+     * Connexion utilisateur
+     */
+    async login(loginData, sessionInfo) {
+        try {
+            // Rechercher utilisateur par email
+            const user = await prisma.user.findUnique({
+                where: { email: loginData.email }
+            });
+            if (!user) {
+                return {
+                    success: false,
+                    message: 'Email ou mot de passe incorrect'
+                };
+            }
+            // Vérifier mot de passe
+            const passwordMatch = await bcryptjs_1.default.compare(loginData.password, user.passwordHash);
+            if (!passwordMatch) {
+                return {
+                    success: false,
+                    message: 'Email ou mot de passe incorrect'
+                };
+            }
+            // Générer token JWT
+            const token = this.generateJWT(user.id, user.email);
+            const refreshToken = this.generateRefreshToken();
+            // Invalider anciennes sessions
+            await prisma.userSession.updateMany({
+                where: { userId: user.id },
+                data: { isActive: false }
+            });
+            // Créer nouvelle session
+            await prisma.userSession.create({
+                data: {
+                    userId: user.id,
+                    token,
+                    refreshToken,
+                    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 jours
+                }
+            });
+            return {
+                success: true,
+                user: this.sanitizeUser(user),
+                token,
+                message: 'Connexion réussie'
+            };
+        }
+        catch (error) {
+            console.error('❌ Login error:', error);
+            return {
+                success: false,
+                message: 'Erreur lors de la connexion'
+            };
+        }
+    }
+    /**
+     * Déconnexion utilisateur
+     */
+    async logout(token) {
+        try {
+            // Invalider la session
+            await prisma.userSession.updateMany({
+                where: { token },
+                data: { isActive: false }
+            });
+            return {
+                success: true,
+                message: 'Déconnexion réussie'
+            };
+        }
+        catch (error) {
+            console.error('❌ Logout error:', error);
+            return {
+                success: false,
+                message: 'Erreur lors de la déconnexion'
+            };
+        }
+    }
+    /**
+     * Récupérer utilisateur par token JWT
+     */
+    async getUserFromToken(token) {
+        try {
+            // Vérifier token JWT
+            const decoded = jsonwebtoken_1.default.verify(token, this.jwtSecret);
+            // Vérifier session active
+            const session = await prisma.userSession.findFirst({
+                where: {
+                    token,
+                    isActive: true,
+                    expiresAt: { gt: new Date() }
+                }
+            });
+            if (!session) {
+                return null;
+            }
+            // Récupérer utilisateur
+            const user = await prisma.user.findUnique({
+                where: { id: decoded.userId }
+            });
+            return user ? this.sanitizeUser(user) : null;
+        }
+        catch (error) {
+            return null;
+        }
+    }
+    // === MÉTHODES UTILITAIRES ===
+    // ✅ CORRECTION COMPLÈTE
+    generateJWT(userId, email) {
+        return jsonwebtoken_1.default.sign({ userId, email }, this.jwtSecret, { expiresIn: '7d' });
+    }
+    generateRefreshToken() {
+        return require('crypto').randomBytes(32).toString('hex');
+    }
+    generateEmailValidationToken() {
+        return require('crypto').randomBytes(32).toString('hex');
+    }
     sanitizeUser(user) {
         const { passwordHash, ...safeUser } = user;
         return safeUser;
     }
 }
 exports.AuthService = AuthService;
+exports.authService = new AuthService();

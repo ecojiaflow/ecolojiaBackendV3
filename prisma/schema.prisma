@@ -1,3 +1,8 @@
+// backend/prisma/schema.prisma
+// ================================
+// CONFIGURATION PRISMA COMPLÈTE
+// ================================
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -6,6 +11,10 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// ================================
+// MODÈLES EXISTANTS (PRODUITS)
+// ================================
 
 model Product {
   id               String           @id @default(uuid())
@@ -31,7 +40,10 @@ model Product {
   updated_at       DateTime         @updatedAt
   image_url        String?
   barcode          String?          @unique
+  
+  // Relations
   partnerLinks     PartnerLink[]
+  analyses         ProductAnalysis[]
 
   @@map("products")
 }
@@ -81,6 +93,92 @@ model PartnerLink {
   @@map("partner_links")
 }
 
+// ================================
+// NOUVEAUX MODÈLES (AUTHENTIFICATION)
+// ================================
+
+model User {
+  id                 String   @id @default(uuid())
+  email              String   @unique
+  passwordHash       String   @map("password_hash")
+  name               String
+  tier               UserTier @default(free)
+  emailVerified      Boolean  @default(false) @map("email_verified")
+  stripeCustomerId   String?  @map("stripe_customer_id")
+  
+  // Timestamps
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  lastLoginAt        DateTime? @map("last_login_at")
+  
+  // JSON fields pour flexibilité
+  preferences        Json?    @default("{}")
+  quotas             Json?    @default("{}")
+  currentUsage       Json?    @default("{}")
+  stats              Json?    @default("{}")
+  
+  // Relations
+  emailVerifications EmailVerification[]
+  sessions           UserSession[]
+  analyses           ProductAnalysis[]
+  
+  @@map("users")
+}
+
+model EmailVerification {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  email     String
+  token     String   @unique
+  verified  Boolean  @default(false)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relation optionnelle vers User
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_verifications")
+}
+
+model UserSession {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  token        String   @unique
+  refreshToken String   @unique @map("refresh_token")
+  expiresAt    DateTime @map("expires_at")
+  isActive     Boolean  @default(true) @map("is_active")
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+  createdAt    DateTime @default(now()) @map("created_at")
+  
+  // Relation vers User
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("user_sessions")
+}
+
+model ProductAnalysis {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  productId   String   @map("product_id")
+  category    String
+  healthScore Int      @map("health_score")
+  scanMethod  String   @map("scan_method") // 'barcode', 'manual', 'photo'
+  analysisData Json    @map("analysis_data")
+  scannedAt   DateTime @default(now()) @map("scanned_at")
+  
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@map("product_analyses")
+}
+
+// ================================
+// ENUMS
+// ================================
+
 enum ConfidenceColor {
   green
   yellow
@@ -93,4 +191,9 @@ enum VerifiedStatus {
   manual_review
   rejected
   ai_analyzed
+}
+
+enum UserTier {
+  free
+  premium
 }
