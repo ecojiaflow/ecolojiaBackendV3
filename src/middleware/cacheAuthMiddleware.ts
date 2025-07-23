@@ -3,44 +3,16 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 import { cacheService } from '../services/CacheService';
+import { CacheUser, CacheAuthRequest } from '../types/cacheTypes';
 
 const prisma = new PrismaClient();
-
-// Types pour TypeScript
-interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    name: string;
-    emailVerified: boolean;
-    tier?: 'free' | 'premium';
-    quotas?: {
-      analyses: number;
-      maxAnalyses: number;
-    };
-  };
-  session?: {
-    id: string;
-    token: string;
-    expiresAt: Date;
-  };
-  body: any; // Ajout du type body
-}
-
-interface JWTPayload {
-  userId: string;
-  email: string;
-  sessionId: string;
-  iat?: number;
-  exp?: number;
-}
 
 /**
  * 🚀 Middleware d'authentification optimisé avec cache Redis
  * Performance: 100ms → 5ms (20x faster)
  */
 export const cacheAuthMiddleware = async (
-  req: AuthRequest,
+  req: CacheAuthRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -64,8 +36,8 @@ export const cacheAuthMiddleware = async (
     
     if (cachedSession) {
       // ✅ CACHE HIT - Pas de requête DB !
-      req.user = cachedSession.user;
-      req.session = cachedSession.session;
+      req.cacheUser = cachedSession.user;
+      req.cacheSession = cachedSession.session;
       
       const cacheTime = Date.now() - startTime;
       console.log(`⚡ Auth cache hit: ${cacheTime}ms`);
@@ -106,10 +78,7 @@ export const cacheAuthMiddleware = async (
             id: true,
             email: true,
             name: true,
-            emailVerified: true,
-            // Ajouter les champs Premium si ils existent
-            // tier: true,
-            // currentQuota: true
+            emailVerified: true
           }
         }
       }
@@ -139,7 +108,7 @@ export const cacheAuthMiddleware = async (
     const quotas = await calculateUserQuotas(session.user.id);
 
     // 7. Préparer les données utilisateur
-    const userData = {
+    const userData: CacheUser = {
       id: session.user.id,
       email: session.user.email,
       name: session.user.name,
@@ -161,8 +130,8 @@ export const cacheAuthMiddleware = async (
     }, 3600); // Cache 1 heure
 
     // 9. Attacher à la requête
-    req.user = userData;
-    req.session = sessionData;
+    req.cacheUser = userData;
+    req.cacheSession = sessionData;
 
     const dbTime = Date.now() - startTime;
     console.log(`🗄️ Auth DB lookup: ${dbTime}ms`);
@@ -227,9 +196,9 @@ export const publicRouteRateLimit = async (
  * 🎯 Middleware pour vérifier les quotas (analyses)
  */
 export const checkQuotaMiddleware = (action: string = 'analysis') => {
-  return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  return async (req: CacheAuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      if (!req.user) {
+      if (!req.cacheUser) {
         res.status(401).json({
           success: false,
           error: 'Authentification requise'
@@ -238,8 +207,8 @@ export const checkQuotaMiddleware = (action: string = 'analysis') => {
       }
 
       // Vérifier le quota actuel
-      const currentQuota = await cacheService.getQuota(req.user.id, action);
-      const maxQuota = req.user.tier === 'premium' ? -1 : 20; // -1 = illimité
+      const currentQuota = await cacheService.getQuota(req.cacheUser.id, action);
+      const maxQuota = req.cacheUser.tier === 'premium' ? -1 : 20; // -1 = illimité
 
       // Premium = pas de limite
       if (maxQuota === -1) {
@@ -266,7 +235,7 @@ export const checkQuotaMiddleware = (action: string = 'analysis') => {
       }
 
       // Incrémenter le quota
-      const newQuota = await cacheService.incrementQuota(req.user.id, action);
+      const newQuota = await cacheService.incrementQuota(req.cacheUser.id, action);
       
       // Ajouter info quota dans la réponse
       res.setHeader('X-Quota-Used', newQuota.toString());
@@ -285,7 +254,7 @@ export const checkQuotaMiddleware = (action: string = 'analysis') => {
  * 🔐 Middleware pour admin uniquement
  */
 export const adminAuthMiddleware = async (
-  req: AuthRequest,
+  req: CacheAuthRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -293,7 +262,7 @@ export const adminAuthMiddleware = async (
     // Utiliser le middleware auth de base d'abord
     await cacheAuthMiddleware(req, res, () => {
       // Vérifier si admin
-      if (!req.user || req.user.email !== process.env.ADMIN_EMAIL) {
+      if (!req.cacheUser || req.cacheUser.email !== process.env.ADMIN_EMAIL) {
         res.status(403).json({
           success: false,
           error: 'Accès refusé',
@@ -316,16 +285,16 @@ export const adminAuthMiddleware = async (
  * 🔄 Middleware pour rafraîchir le cache session
  */
 export const refreshSessionCache = async (
-  req: AuthRequest,
+  req: CacheAuthRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    if (req.session && req.user) {
+    if (req.cacheSession && req.cacheUser) {
       // Rafraîchir le cache avec TTL étendu
-      await cacheService.cacheSession(req.session.token, {
-        user: req.user,
-        session: req.session
+      await cacheService.cacheSession(req.cacheSession.token, {
+        user: req.cacheUser,
+        session: req.cacheSession
       }, 7200); // 2 heures
     }
     next();
@@ -334,6 +303,15 @@ export const refreshSessionCache = async (
     next();
   }
 };
+
+// Ajouter les types JWT
+interface JWTPayload {
+  userId: string;
+  email: string;
+  sessionId: string;
+  iat?: number;
+  exp?: number;
+}
 
 // Fonctions utilitaires
 
@@ -369,16 +347,20 @@ async function calculateUserQuotas(userId: string): Promise<any> {
     const maxQuota = 20; // TODO: Vérifier tier Premium
     
     return {
-      analyses: currentQuota,
-      maxAnalyses: maxQuota,
+      scansPerMonth: maxQuota,
+      aiQuestionsPerDay: 0, // TODO: Implémenter
+      exportsPerMonth: 0, // TODO: Implémenter
+      used: currentQuota,
       remaining: Math.max(0, maxQuota - currentQuota),
       resetDate: getMonthResetDate()
     };
   } catch (error) {
     console.error('❌ Calculate quotas error:', error);
     return {
-      analyses: 0,
-      maxAnalyses: 20,
+      scansPerMonth: 20,
+      aiQuestionsPerDay: 0,
+      exportsPerMonth: 0,
+      used: 0,
       remaining: 20,
       resetDate: getMonthResetDate()
     };
@@ -394,4 +376,4 @@ function getMonthResetDate(): Date {
 }
 
 // Export types pour utilisation dans d'autres fichiers
-export type { AuthRequest, JWTPayload };
+export type { CacheAuthRequest, JWTPayload };
