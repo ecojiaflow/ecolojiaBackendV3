@@ -1,8 +1,10 @@
 // PATH: backend/src/middleware/cacheAuthMiddleware.ts
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../config/database';
+import { PrismaClient } from '@prisma/client';
 import { cacheService } from '../services/CacheService';
+
+const prisma = new PrismaClient();
 
 // Types pour TypeScript
 interface AuthRequest extends Request {
@@ -22,6 +24,7 @@ interface AuthRequest extends Request {
     token: string;
     expiresAt: Date;
   };
+  body: any; // Ajout du type body
 }
 
 interface JWTPayload {

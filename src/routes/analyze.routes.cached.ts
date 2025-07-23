@@ -3,7 +3,7 @@
 
 import { Router, Request, Response } from 'express';
 import { cacheService } from '../services/CacheService';
-import { cacheAuthMiddleware, checkQuotaMiddleware, publicRouteRateLimit, AuthRequest } from '../middleware/cacheAuthMiddleware';
+import { cacheAuthMiddleware, checkQuotaMiddleware, publicRouteRateLimit } from '../middleware/cacheAuthMiddleware';
 
 // Import des scorers existants (gardez vos imports actuels)
 const foodScorer = require('../scorers/food/foodScorer');
@@ -16,6 +16,26 @@ const router = Router();
 const cosmeticScorer = new CosmeticScorer();
 const detergentScorer = new DetergentScorer();
 const productTypeDetector = new ProductTypeDetector();
+
+// Interface étendue pour les requêtes avec auth
+interface AuthRequest extends Request {
+  user?: {
+    id: string;
+    email: string;
+    name: string;
+    emailVerified: boolean;
+    tier?: 'free' | 'premium';
+    quotas?: {
+      analyses: number;
+      maxAnalyses: number;
+    };
+  };
+  session?: {
+    id: string;
+    token: string;
+    expiresAt: Date;
+  };
+}
 
 // Configuration cache TTL par type d'analyse
 const CACHE_TTL = {
@@ -203,8 +223,9 @@ router.post('/auto',
 router.post('/food',
   cacheAuthMiddleware,          // Auth avec cache Redis
   checkQuotaMiddleware('analysis'), // Vérification quota 20/mois
-  async (req: AuthRequest, res: Response) => {
+  async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
     const startTime = Date.now();
     const { productData, userProfile = {} } = req.body;
 
@@ -230,7 +251,7 @@ router.post('/food',
         _performance: {
           cached: true,
           processingTime: `${cacheTime}ms`,
-          userId: req.user?.id
+          userId: authReq.user?.id
         }
       });
     }
@@ -272,7 +293,7 @@ router.post('/food',
       _performance: {
         cached: false,
         processingTime: `${processingTime}ms`,
-        userId: req.user?.id
+        userId: authReq.user?.id
       }
     };
 
@@ -302,8 +323,9 @@ router.post('/food',
 router.post('/cosmetic',
   cacheAuthMiddleware,
   checkQuotaMiddleware('analysis'),
-  async (req: AuthRequest, res: Response) => {
+  async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
     const startTime = Date.now();
     const { product_name, ingredients, composition, inci, category, brand } = req.body;
     
@@ -336,7 +358,7 @@ router.post('/cosmetic',
         _performance: {
           cached: true,
           processingTime: `${cacheTime}ms`,
-          userId: req.user?.id
+          userId: authReq.user?.id
         }
       });
     }
@@ -376,7 +398,7 @@ router.post('/cosmetic',
       _performance: {
         cached: false,
         processingTime: `${processingTime}ms`,
-        userId: req.user?.id
+        userId: authReq.user?.id
       }
     };
 
@@ -406,8 +428,9 @@ router.post('/cosmetic',
 router.post('/detergent',
   cacheAuthMiddleware,
   checkQuotaMiddleware('analysis'),
-  async (req: AuthRequest, res: Response) => {
+  async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
     const startTime = Date.now();
     const { product_name, ingredients, composition, certifications, brand, category } = req.body;
 
@@ -438,7 +461,7 @@ router.post('/detergent',
         _performance: {
           cached: true,
           processingTime: `${cacheTime}ms`,
-          userId: req.user?.id
+          userId: authReq.user?.id
         }
       });
     }
@@ -475,7 +498,7 @@ router.post('/detergent',
       _performance: {
         cached: false,
         processingTime: `${processingTime}ms`,
-        userId: req.user?.id
+        userId: authReq.user?.id
       }
     };
 
@@ -598,16 +621,17 @@ router.post('/ultra-transform',
  */
 router.get('/stats',
   cacheAuthMiddleware,
-  async (req: AuthRequest, res: Response) => {
+  async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
     const stats = await cacheService.getCacheStats();
     
     res.json({
       success: true,
       cacheStats: stats,
       user: {
-        id: req.user?.id,
-        quotas: req.user?.quotas
+        id: authReq.user?.id,
+        quotas: authReq.user?.quotas
       },
       performance: {
         message: 'Cache Redis actif - Performance 20x améliorée',
@@ -630,10 +654,12 @@ router.get('/stats',
  */
 router.post('/cache/clear',
   cacheAuthMiddleware,
-  async (req: AuthRequest, res: Response) => {
+  async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
+    
     // Vérifier droits admin
-    if (req.user?.email !== process.env.ADMIN_EMAIL) {
+    if (authReq.user?.email !== process.env.ADMIN_EMAIL) {
       return res.status(403).json({
         success: false,
         error: 'Droits administrateur requis'
