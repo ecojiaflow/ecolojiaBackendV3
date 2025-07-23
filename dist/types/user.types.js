@@ -1,3 +1,3 @@
 "use strict";
-// À REMPLACER dans backend/src/auth/types/AuthTypes.ts
+// backend/src/types/user.types.ts
 Object.defineProperty(exports, "__esModule", { value: true });

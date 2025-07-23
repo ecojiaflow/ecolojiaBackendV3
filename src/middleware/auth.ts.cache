@@ -1,0 +1,226 @@
+// backend/src/middleware/auth.ts
+
+import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+import { sessionCache } from '../services/cache/SessionCache';
+import { Logger } from '../utils/Logger';
+
+const logger = new Logger('AuthMiddleware');
+
+interface JWTPayload {
+  userId: string;
+  email: string;
+  iat: number;
+  exp: number;
+}
+
+/**
+ * Middleware d'authentification avec cache Redis
+ */
+export const authenticate = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    // 1. Extraire le token du header Authorization
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({
+        success: false,
+        message: 'Token d\'authentification manquant'
+      });
+      return;
+    }
+
+    const token = authHeader.substring(7);
+    req.token = token;
+
+    // 2. Vérifier la session dans le cache Redis (ULTRA RAPIDE)
+    const startTime = Date.now();
+    const session = await sessionCache.getSession(token);
+    const cacheTime = Date.now() - startTime;
+
+    if (session && session.isActive) {
+      // Cache HIT - Session trouvée et valide
+      req.user = session.user;
+      logger.info(`✅ Auth Cache HIT (${cacheTime}ms) - User: ${session.user.email}`);
+      next();
+      return;
+    }
+
+    // 3. Cache MISS - Vérifier le JWT
+    logger.info(`❌ Auth Cache MISS - Vérification JWT`);
+    
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || 'your-secret-key'
+    ) as JWTPayload;
+
+    // 4. Récupérer l'utilisateur de la base de données
+    const User = require('../models/User').default;
+    const user = await User.findById(decoded.userId).select('-password');
+
+    if (!user) {
+      res.status(401).json({
+        success: false,
+        message: 'Utilisateur non trouvé'
+      });
+      return;
+    }
+
+    // 5. Créer une nouvelle session en cache
+    await sessionCache.createSession(token, {
+      id: user._id.toString(),
+      email: user.email,
+      name: user.name,
+      tier: user.tier || 'free',
+      isEmailVerified: user.isEmailVerified || false
+    });
+
+    req.user = {
+      id: user._id.toString(),
+      email: user.email,
+      name: user.name,
+      tier: user.tier || 'free',
+      isEmailVerified: user.isEmailVerified || false
+    };
+
+    const totalTime = Date.now() - startTime;
+    logger.info(`⏱️ Auth total time: ${totalTime}ms (DB lookup required)`);
+
+    next();
+  } catch (error: any) {
+    if (error.name === 'TokenExpiredError') {
+      res.status(401).json({
+        success: false,
+        message: 'Token expiré'
+      });
+      return;
+    }
+
+    if (error.name === 'JsonWebTokenError') {
+      res.status(401).json({
+        success: false,
+        message: 'Token invalide'
+      });
+      return;
+    }
+
+    logger.error('❌ Erreur authentification:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur lors de l\'authentification'
+    });
+  }
+};
+
+/**
+ * Middleware pour vérifier si l'utilisateur est Premium
+ */
+export const requirePremium = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({
+      success: false,
+      message: 'Authentification requise'
+    });
+    return;
+  }
+
+  if (req.user.tier !== 'premium') {
+    res.status(403).json({
+      success: false,
+      message: 'Accès réservé aux utilisateurs Premium',
+      requiredTier: 'premium',
+      userTier: req.user.tier
+    });
+    return;
+  }
+
+  next();
+};
+
+/**
+ * Middleware pour vérifier si l'email est vérifié
+ */
+export const requireVerifiedEmail = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({
+      success: false,
+      message: 'Authentification requise'
+    });
+    return;
+  }
+
+  if (!req.user.isEmailVerified) {
+    res.status(403).json({
+      success: false,
+      message: 'Veuillez vérifier votre adresse email',
+      emailVerified: false
+    });
+    return;
+  }
+
+  next();
+};
+
+/**
+ * Middleware optionnel - Authentifie si token présent, sinon continue
+ */
+export const optionalAuth = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Pas de token, continuer sans authentification
+    next();
+    return;
+  }
+
+  // Si token présent, tenter l'authentification
+  authenticate(req, res, (err?: any) => {
+    if (err) {
+      // Erreur d'authentification, continuer sans user
+      req.user = undefined;
+    }
+    next();
+  });
+};
+
+/**
+ * Déconnecter l'utilisateur (invalider la session)
+ */
+export const logout = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    if (req.token) {
+      await sessionCache.invalidateSession(req.token);
+      logger.info(`🚪 User logged out: ${req.user?.email}`);
+    }
+
+    res.json({
+      success: true,
+      message: 'Déconnexion réussie'
+    });
+  } catch (error) {
+    logger.error('❌ Erreur logout:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la déconnexion'
+    });
+  }
+};

@@ -1,4 +1,4 @@
-// 🔴 BACKEND - backend/src/utils/Logger.ts
+// backend/src/utils/Logger.ts
 
 export class Logger {
   private context: string;
@@ -25,3 +25,6 @@ export class Logger {
     }
   }
 }
+
+// Export une instance par défaut si besoin
+export const logger = new Logger('Ecolojia');

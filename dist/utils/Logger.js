@@ -1,7 +1,7 @@
 "use strict";
-// 🔴 BACKEND - backend/src/utils/Logger.ts
+// backend/src/utils/Logger.ts
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Logger = void 0;
+exports.logger = exports.Logger = void 0;
 class Logger {
     constructor(context = 'App') {
         this.context = context;
@@ -22,3 +22,5 @@ class Logger {
     }
 }
 exports.Logger = Logger;
+// Export une instance par défaut si besoin
+exports.logger = new Logger('Ecolojia');
