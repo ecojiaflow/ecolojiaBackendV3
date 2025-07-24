@@ -1,9 +1,9 @@
-// PATH: backend/src/auth/middleware/auth.ts
+// PATH: src/auth/middleware/auth.ts
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 
-import { UserModel } from '../../models/User';
+import UserModel from '../../models/User';            // ✅ import par défaut
 import { Logger } from '../../utils/Logger';
 
 const logger = new Logger('AuthMiddleware');
@@ -15,9 +15,9 @@ interface JwtPayload {
 }
 
 /**
- * Vérifie le JWT et attache req.user
- *  • Accepte des IDs au format ObjectId **ou** UUID (string)
- *  • Répond 401 si token manquant/invalide ou utilisateur introuvable
+ * Middleware d'authentification
+ *  • Gère IDs en ObjectId **et** UUID
+ *  • Attache req.user { id, email, tier }
  */
 export async function authenticate(
   req: Request,
@@ -25,39 +25,40 @@ export async function authenticate(
   next: NextFunction
 ) {
   try {
-    /* 1 – Extraire le token */
+    /* 1. Extraire le token */
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
       return res.status(401).json({ success: false, message: 'Token manquant' });
     }
     const token = authHeader.split(' ')[1];
 
-    /* 2 – Vérifier / décoder */
-    const secret = process.env.JWT_SECRET || 'secret';
-    const decoded = jwt.verify(token, secret) as JwtPayload;
+    /* 2. Vérifier / décoder */
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || 'secret'
+    ) as JwtPayload;
 
-    /* 3 – Chercher l’utilisateur (ObjectId OU UUID) */
-    const { userId } = decoded;
-    const query = mongoose.Types.ObjectId.isValid(userId)
-      ? { _id: userId }
-      : { id: userId }; // champ id = UUID
+    /* 3. Chercher l'utilisateur (ObjectId OU UUID) */
+    const query = mongoose.Types.ObjectId.isValid(decoded.userId)
+      ? { _id: decoded.userId }
+      : { id: decoded.userId };
 
     const user = await UserModel.findOne(query).lean();
     if (!user) {
       return res.status(401).json({ success: false, message: 'Utilisateur introuvable' });
     }
 
-    /* 4 – Attacher les infos utiles : */
+    /* 4. Attacher et next */
     req.user = {
       id: user.id || user._id?.toString(),
       email: user.email,
       tier: user.tier || 'free'
     };
 
-    return next();
-  } catch (err: any) {
+    next();
+  } catch (err) {
     logger.error('[AUTH ERROR]:', err);
-    return res.status(401).json({ success: false, message: 'Token invalide' });
+    res.status(401).json({ success: false, message: 'Token invalide' });
   }
 }
 // EOF

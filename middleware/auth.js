@@ -1,4 +1,5 @@
 // middleware/auth.js
+console.log('[DEBUG] JWT_SECRET utilisé =', process.env.JWT_SECRET);
 const validateApiKey = (req, res, next) => {
   const apiKey = req.headers['x-api-key'];
   

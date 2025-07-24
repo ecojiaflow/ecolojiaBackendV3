@@ -188,7 +188,7 @@ router.get('/stats', auth_1.authenticate, async (req, res) => {
  */
 router.get('/quota', auth_1.authenticate, async (req, res) => {
     try {
-        const quotaStatus = await QuotaManager_1.quotaManager.getUserQuotaStatus(req.user.id, req.user.tier);
+        const quotaStatus = await QuotaManager_1.quotaManager.getUserQuotaStatus(req.user.id);
         return res.json({
             success: true,
             data: quotaStatus
