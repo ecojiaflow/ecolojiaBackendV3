@@ -1,143 +1,63 @@
-// backend/src/auth/middleware/auth.ts
-
+// PATH: backend/src/auth/middleware/auth.ts
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import User from '../../models/User';
+import mongoose from 'mongoose';
 
-interface JWTPayload {
+import { UserModel } from '../../models/User';
+import { Logger } from '../../utils/Logger';
+
+const logger = new Logger('AuthMiddleware');
+
+interface JwtPayload {
   userId: string;
   email: string;
-  iat: number;
-  exp: number;
-}
-
-// Type simplifié pour éviter les conflits
-interface AuthUser {
-  id: string;
-  email: string;
-  name: string;
-  tier: 'free' | 'premium';
-  isEmailVerified: boolean;
+  tier?: 'free' | 'premium' | string;
 }
 
 /**
- * Middleware d'authentification simple
+ * Vérifie le JWT et attache req.user
+ *  • Accepte des IDs au format ObjectId **ou** UUID (string)
+ *  • Répond 401 si token manquant/invalide ou utilisateur introuvable
  */
-export const authenticate = async (
+export async function authenticate(
   req: Request,
   res: Response,
   next: NextFunction
-): Promise<void> => {
+) {
   try {
+    /* 1 – Extraire le token */
     const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({
-        success: false,
-        message: 'Token d\'authentification manquant'
-      });
-      return;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, message: 'Token manquant' });
     }
+    const token = authHeader.split(' ')[1];
 
-    const token = authHeader.substring(7);
-    
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || 'your-secret-key'
-    ) as JWTPayload;
+    /* 2 – Vérifier / décoder */
+    const secret = process.env.JWT_SECRET || 'secret';
+    const decoded = jwt.verify(token, secret) as JwtPayload;
 
-    const user = await User.findById(decoded.userId).select('-password');
+    /* 3 – Chercher l’utilisateur (ObjectId OU UUID) */
+    const { userId } = decoded;
+    const query = mongoose.Types.ObjectId.isValid(userId)
+      ? { _id: userId }
+      : { id: userId }; // champ id = UUID
 
+    const user = await UserModel.findOne(query).lean();
     if (!user) {
-      res.status(401).json({
-        success: false,
-        message: 'Utilisateur non trouvé'
-      });
-      return;
+      return res.status(401).json({ success: false, message: 'Utilisateur introuvable' });
     }
 
-    // Assigner l'utilisateur avec le bon type
+    /* 4 – Attacher les infos utiles : */
     req.user = {
-      id: user._id.toString(),
+      id: user.id || user._id?.toString(),
       email: user.email,
-      name: user.name,
-      tier: user.tier || 'free',
-      isEmailVerified: user.isEmailVerified || false
+      tier: user.tier || 'free'
     };
 
-    console.log(`[AUTH] User authenticated: ${user.email}`);
-    next();
-  } catch (error: any) {
-    if (error.name === 'TokenExpiredError') {
-      res.status(401).json({
-        success: false,
-        message: 'Token expiré'
-      });
-      return;
-    }
-
-    if (error.name === 'JsonWebTokenError') {
-      res.status(401).json({
-        success: false,
-        message: 'Token invalide'
-      });
-      return;
-    }
-
-    console.error('[AUTH ERROR]:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur serveur'
-    });
+    return next();
+  } catch (err: any) {
+    logger.error('[AUTH ERROR]:', err);
+    return res.status(401).json({ success: false, message: 'Token invalide' });
   }
-};
-
-export const requirePremium = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  if (!req.user) {
-    res.status(401).json({
-      success: false,
-      message: 'Authentification requise'
-    });
-    return;
-  }
-
-  if (req.user.tier !== 'premium') {
-    res.status(403).json({
-      success: false,
-      message: 'Accès réservé aux utilisateurs Premium'
-    });
-    return;
-  }
-
-  next();
-};
-
-export const requireVerifiedEmail = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  if (!req.user) {
-    res.status(401).json({
-      success: false,
-      message: 'Authentification requise'
-    });
-    return;
-  }
-
-  if (!req.user.isEmailVerified) {
-    res.status(403).json({
-      success: false,
-      message: 'Veuillez vérifier votre adresse email'
-    });
-    return;
-  }
-
-  next();
-};
-
-export default authenticate;
+}
+// EOF
