@@ -27,14 +27,38 @@ class QuotaManager {
 
   async incrementUsage(userId: string, type: QuotaType): Promise<void> {
     const key = this.getKey(userId, type);
-    await cacheManager.increment(key, 1, 3600 * 24 * 30); // quota mensuel
+    await cacheManager.increment(key, { step: 1, ttl: 3600 * 24 * 30 }); // ✅ Fix args
   }
 
   async resetUsage(userId: string): Promise<void> {
-    const keys = Object.values(DEFAULT_QUOTAS.free).map((_, i) =>
-      this.getKey(userId, Object.keys(DEFAULT_QUOTAS.free)[i] as QuotaType)
+    const keys = Object.keys(DEFAULT_QUOTAS.free).map((type) =>
+      this.getKey(userId, type as QuotaType)
     );
-    await Promise.all(keys.map((k) => cacheManager.del(k)));
+    for (const key of keys) {
+      await cacheManager.remove(key); // ✅ .remove au lieu de .del
+    }
+  }
+
+  /** Retourne l'état de quota actuel */
+  async getUserQuotaStatus(userId: string): Promise<
+    { action: string; remaining: number; limit: number }[]
+  > {
+    const tier = 'free'; // à remplacer si tu lis depuis Mongo
+    const types = Object.keys(DEFAULT_QUOTAS[tier]) as QuotaType[];
+
+    const status = await Promise.all(
+      types.map(async (type) => {
+        const limit = DEFAULT_QUOTAS[tier][type];
+        const used = await this.getUsage(userId, type);
+        return {
+          action: type,
+          remaining: Math.max(0, limit - used),
+          limit
+        };
+      })
+    );
+
+    return status;
   }
 
   createQuotaMiddleware(type: QuotaType) {
@@ -43,7 +67,7 @@ class QuotaManager {
         const userId = req.user?.id;
         const tier = req.user?.tier || 'free';
 
-        // Bypass en dev si besoin :
+        // Bypass dev
         if (process.env.NODE_ENV === 'development') {
           logger.info(`[DEV] Quota désactivé pour ${type}`);
           return next();
@@ -53,22 +77,25 @@ class QuotaManager {
         const current = await this.getUsage(userId, type);
 
         if (current >= allowed) {
-          logger.warn(`❌ Quota dépassé [${type}] : ${current}/${allowed} (user=${userId})`);
+          logger.warn(`❌ Quota ${type} dépassé : ${current}/${allowed}`);
           return res.status(429).json({
             success: false,
-            message: `Quota mensuel ${type} dépassé. Limite atteinte.`,
-            quota: { allowed, used: current }
+            message: `Quota ${type} dépassé.`,
+            quota: { used: current, max: allowed }
           });
         }
 
-        // Suivi en temps réel
         await this.incrementUsage(userId, type);
-        req.quota = { type, used: current + 1, max: allowed };
+
+        req.quota = {
+          used: current + 1,
+          max: allowed
+        };
 
         next();
-      } catch (error) {
-        logger.error(`Erreur quota middleware [${type}]`, error);
-        return res.status(500).json({ success: false, message: 'Erreur quota' });
+      } catch (err) {
+        logger.error('Erreur middleware quota', err);
+        res.status(500).json({ success: false, message: 'Erreur quota' });
       }
     };
   }
