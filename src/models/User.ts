@@ -1,4 +1,4 @@
-// backend/src/models/User.ts
+// PATH: src/models/User.ts
 
 import mongoose, { Schema, Document } from 'mongoose';
 
@@ -12,43 +12,61 @@ export interface IUser extends Document {
   emailVerificationExpires?: Date;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
+
+  // ✅ Champs Lemon Squeezy
+  customerId?: string;
+  subscriptionId?: string;
+
   createdAt: Date;
   updatedAt: Date;
 }
 
-const UserSchema = new Schema<IUser>({
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true,
-    trim: true
+const UserSchema = new Schema<IUser>(
+  {
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true
+    },
+    password: {
+      type: String,
+      required: true
+    },
+    name: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    tier: {
+      type: String,
+      enum: ['free', 'premium'],
+      default: 'free'
+    },
+    isEmailVerified: {
+      type: Boolean,
+      default: false
+    },
+    emailVerificationToken: String,
+    emailVerificationExpires: Date,
+    resetPasswordToken: String,
+    resetPasswordExpires: Date,
+
+    // ✅ Champs Lemon Squeezy persistés
+    customerId: {
+      type: String,
+      default: null
+    },
+    subscriptionId: {
+      type: String,
+      default: null
+    }
   },
-  password: {
-    type: String,
-    required: true
-  },
-  name: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  tier: {
-    type: String,
-    enum: ['free', 'premium'],
-    default: 'free'
-  },
-  isEmailVerified: {
-    type: Boolean,
-    default: false
-  },
-  emailVerificationToken: String,
-  emailVerificationExpires: Date,
-  resetPasswordToken: String,
-  resetPasswordExpires: Date
-}, {
-  timestamps: true
-});
+  {
+    timestamps: true
+  }
+);
 
 // Index pour les recherches
 UserSchema.index({ email: 1 });
@@ -57,3 +75,4 @@ UserSchema.index({ resetPasswordToken: 1 });
 
 export const User = mongoose.model<IUser>('User', UserSchema);
 export default User;
+// EOF
