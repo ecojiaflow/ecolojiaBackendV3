@@ -1,5 +1,5 @@
 // PATH: backend/src/routes/ai.routes.ts
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { authenticate, AuthRequest } from '../auth/middleware/auth';
 import { aiAnalysisService } from '../services/ai/AIAnalysisService';
 import { Logger } from '../utils/Logger';
@@ -11,8 +11,9 @@ const log = new Logger('AIRoutes');
 // ANALYSE PRODUIT PRINCIPALE
 // ═══════════════════════════════════════════════════════════════════════
 
-router.post('/analyze', authenticate, async (req: AuthRequest, res) => {
+router.post('/analyze', authenticate, async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
     const {
       productName,
       category,
@@ -39,7 +40,7 @@ router.post('/analyze', authenticate, async (req: AuthRequest, res) => {
       });
     }
 
-    log.info(`Analyse demandée: ${productName} (${category}) par ${req.user!.email}`);
+    log.info(`Analyse demandée: ${productName} (${category}) par ${authReq.user!.email}`);
 
     // Analyse
     const result = await aiAnalysisService.analyzeProduct({
@@ -51,9 +52,9 @@ router.post('/analyze', authenticate, async (req: AuthRequest, res) => {
           : ingredients
         : undefined,
       barcode,
-      userId: req.user!.id,
-      userTier: req.user!.tier,
-      useDeepSeek: useDeepSeek && req.user!.tier === 'premium',
+      userId: authReq.user!.id,
+      userTier: authReq.user!.tier,
+      useDeepSeek: useDeepSeek && authReq.user!.tier === 'premium',
       customPrompt
     });
 
@@ -62,8 +63,8 @@ router.post('/analyze', authenticate, async (req: AuthRequest, res) => {
       success: true, 
       data: result,
       user: {
-        id: req.user!.id,
-        tier: req.user!.tier
+        id: authReq.user!.id,
+        tier: authReq.user!.tier
       }
     });
 
@@ -81,7 +82,7 @@ router.post('/analyze', authenticate, async (req: AuthRequest, res) => {
 // ANALYSE RAPIDE (sans auth pour demo)
 // ═══════════════════════════════════════════════════════════════════════
 
-router.post('/quick-analyze', async (req, res) => {
+router.post('/quick-analyze', async (req: Request, res: Response) => {
   try {
     const { productName, category, ingredients } = req.body;
 
@@ -131,8 +132,9 @@ router.post('/quick-analyze', async (req, res) => {
 // HISTORIQUE ANALYSES
 // ═══════════════════════════════════════════════════════════════════════
 
-router.get('/history', authenticate, async (req: AuthRequest, res) => {
+router.get('/history', authenticate, async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
     const { limit = 10, offset = 0 } = req.query;
 
     // TODO: Implémenter récupération depuis DB
@@ -161,8 +163,9 @@ router.get('/history', authenticate, async (req: AuthRequest, res) => {
 // DÉTAILS ANALYSE
 // ═══════════════════════════════════════════════════════════════════════
 
-router.get('/analysis/:id', authenticate, async (req: AuthRequest, res) => {
+router.get('/analysis/:id', authenticate, async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
     const { id } = req.params;
 
     // TODO: Récupérer depuis cache ou DB
@@ -187,8 +190,9 @@ router.get('/analysis/:id', authenticate, async (req: AuthRequest, res) => {
 // EXPORT PDF
 // ═══════════════════════════════════════════════════════════════════════
 
-router.post('/export/:id', authenticate, async (req: AuthRequest, res) => {
+router.post('/export/:id', authenticate, async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
     const { id } = req.params;
     const { format = 'pdf' } = req.body;
 

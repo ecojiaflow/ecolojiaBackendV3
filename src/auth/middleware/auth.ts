@@ -5,7 +5,7 @@ import { Logger } from '../../utils/Logger';
 
 const log = new Logger('AuthMiddleware');
 
-// Interface pour les requêtes authentifiées
+// Interface pour les requêtes authentifiées qui étend Express Request
 export interface AuthRequest extends Request {
   user?: {
     id: string;
@@ -16,7 +16,7 @@ export interface AuthRequest extends Request {
 
 // Middleware d'authentification principal
 export const authenticate = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -47,7 +47,7 @@ export const authenticate = async (
     }
 
     // Ajout des informations utilisateur à la requête
-    req.user = {
+    (req as AuthRequest).user = {
       id: decoded.userId,
       email: decoded.email,
       tier: (decoded.tier as 'free' | 'premium') || 'free'
@@ -87,11 +87,13 @@ export const authenticate = async (
 
 // Middleware pour vérifier si l'utilisateur est premium
 export const requirePremium = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  if (!req.user) {
+  const authReq = req as AuthRequest;
+  
+  if (!authReq.user) {
     res.status(401).json({
       success: false,
       message: 'Authentification requise',
@@ -100,7 +102,7 @@ export const requirePremium = async (
     return;
   }
 
-  if (req.user.tier !== 'premium') {
+  if (authReq.user.tier !== 'premium') {
     res.status(403).json({
       success: false,
       message: 'Abonnement Premium requis',
@@ -114,7 +116,7 @@ export const requirePremium = async (
 
 // Middleware optionnel - authentifie si token présent mais ne bloque pas
 export const optionalAuth = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -125,7 +127,7 @@ export const optionalAuth = async (
     if (token) {
       const decoded = await verifyToken(token);
       if (decoded) {
-        req.user = {
+        (req as AuthRequest).user = {
           id: decoded.userId,
           email: decoded.email,
           tier: (decoded.tier as 'free' | 'premium') || 'free'
@@ -139,3 +141,5 @@ export const optionalAuth = async (
 
   next();
 };
+
+export default authenticate;
