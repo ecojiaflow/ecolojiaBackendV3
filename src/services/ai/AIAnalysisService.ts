@@ -1,54 +1,123 @@
 // PATH: backend/src/services/ai/AIAnalysisService.ts
-import { deepSeekClient } from './DeepSeekClient';
 import { Logger } from '../../utils/Logger';
-import { ProductAnalysisModel } from '../../models/ProductAnalysis';
-import { cacheManager } from '../cache/CacheManager';
+import { analysisCache } from '../cache/AnalysisCache';
+import { healthScoreCalculator } from './HealthScoreCalculator';
+import { novaClassifier } from './novaClassifier';
+import { deepSeekClient } from './DeepSeekClient';
 
-const logger = new Logger('AIAnalysisService');
+const log = new Logger('AIAnalysisService');
 
-export interface AnalysisRequest {
+export interface ProductAnalysisRequest {
   productName: string;
   category: 'food' | 'cosmetics' | 'detergents';
   ingredients?: string[];
+  barcode?: string;
   userId: string;
-  premium: boolean;
-  prompt?: string;
+  userTier: 'free' | 'premium';
+  useDeepSeek?: boolean;
+  customPrompt?: string;
 }
 
-export class AIAnalysisService {
-  async analyze(req: AnalysisRequest) {
-    logger.info(`Analyse IA : ${req.productName}`);
+export interface ProductAnalysisResult {
+  id: string;
+  productName: string;
+  category: 'food' | 'cosmetics' | 'detergents';
+  healthScore: number;
+  analysis: any;
+  insights: { educational: string[]; recommendations: string[]; warnings?: string[] };
+  alternatives: any[];
+  scientificSources: string[];
+  aiEnhancement?: any;
+  confidence: number;
+  analyzedAt: Date;
+}
 
-    // 1 : cache météo
-    const key = `analysis:${req.category}:${req.productName}`;
-    const cached = await cacheManager.get(key);
-    if (cached && !req.prompt) return cached;
+const HIGH_RISK = new Set([
+  'E102','E110','E124','E129','E150D','E249','E250','E320','E321'
+]);
 
-    // 2 : mock analyse de base (à remplacer par vos services internes)
-    const base = { score: 75, issues: ['sucre'] };
+class AIAnalysisService {
+  async analyzeProduct(req: ProductAnalysisRequest): Promise<ProductAnalysisResult> {
+    /* 1. Cache */
+    const cached = await analysisCache.getAnalysisByProduct(
+      req.productName,
+      req.category,
+      req.ingredients ?? []
+    ) as ProductAnalysisResult | null;
 
-    // 3 : DeepSeek enrichment (premium uniquement)
-    let enhance: any = null;
-    if (req.premium) {
-      enhance = await deepSeekClient.enhanceProductAnalysis({
-        productName: req.productName,
-        category: req.category,
-        baseAnalysis: base,
-        userQuery: req.prompt
-      });
+    if (cached && !req.customPrompt) {
+      log.info('✅ Cache HIT');
+      return cached;
     }
 
-    const result = {
+    /* 2. Base NOVA */
+    const nova = await novaClassifier.classify({
+      title: req.productName,
+      ingredients: req.ingredients ?? []
+    });
+
+    /* 3. HealthScore */
+    const score = healthScoreCalculator.calculate({
+      category: req.category,
+      productName: req.productName,
+      ingredients: req.ingredients ?? [],
+      novaAnalysis: {
+        group: nova.novaGroup,
+        confidence: nova.confidence,
+        additives: nova.analysis.additives.map((code: string) => ({
+          code,
+          name: code,
+          riskLevel: HIGH_RISK.has(code) ? 'high' : 'medium'
+        }))
+      }
+    } as any);
+
+    /* 4. Result */
+    const now = new Date();
+    const result: ProductAnalysisResult = {
+      id: `an-${now.getTime()}`,
       productName: req.productName,
       category: req.category,
-      base,
-      enhance,
-      createdAt: new Date()
+      healthScore: score.score,
+      analysis: { nova, healthScore: score },
+      insights: {
+        educational: score.recommendations,
+        recommendations: [],
+        warnings: []
+      },
+      alternatives: [],
+      scientificSources: ['INSERM 2024', 'ANSES 2024'],
+      confidence: score.confidence,
+      analyzedAt: now
     };
 
-    // 4 : persistance Mongo + cache
-    await ProductAnalysisModel.create(result);
-    await cacheManager.set(key, result, 86_400);
+    /* 5. DeepSeek (premium) */
+    if (req.userTier === 'premium' && req.useDeepSeek) {
+      const enh = await deepSeekClient.enhanceProductAnalysis({
+        productName: req.productName,
+        category: req.category,
+        baseAnalysis: result,
+        userQuery: req.customPrompt
+      });
+      result.aiEnhancement = enh;
+      result.insights.educational.push(...enh.enhancedInsights);
+      result.insights.recommendations.push(...enh.personalizedRecommendations);
+      result.confidence = Math.max(result.confidence, enh.confidence);
+    }
+
+    /* 6. Cache */
+    await analysisCache.cacheAnalysis(
+      {
+        id: result.id,
+        productName: result.productName,
+        barcode: req.barcode,
+        category: result.category,
+        healthScore: result.healthScore,
+        analysis: result,
+        analyzedAt: result.analyzedAt
+      },
+      req.ingredients ?? []
+    );
 
     return result;
   }

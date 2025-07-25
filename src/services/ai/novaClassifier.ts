@@ -1,417 +1,211 @@
 // PATH: backend/src/services/ai/novaClassifier.ts
-
 /**
- * 🔬 ECOLOJIA - Classification NOVA Scientifique
- * Implémentation officielle selon INSERM/ANSES 2024
+ * 🔬 NOVA Classifier (INSERM / ANSES 2024)
+ * Détection : additifs, marqueurs industriels, ultra-transformation.
+ * Sortie : groupe NOVA, confiance, impact santé, recommandations.
  */
 
+import { Logger } from '../../utils/Logger';
+
+const log   = new Logger('NovaClassifier');
+const debug = (...a: unknown[]) =>
+  process.env.NODE_ENV !== 'production' && (log as any).info(...a);
+
+/* ═════════════════════════ CONSTANTES ═════════════════════════ */
+const NOVA_DESC = {
+  1: 'Non transformés ou minimalement transformés',
+  2: 'Ingrédients culinaires transformés',
+  3: 'Aliments transformés',
+  4: 'Aliments ultra-transformés'
+} as const;
+
+const MARKERS = {
+  adds: [
+    'E102','E110','E124','E129','E131','E133','E150D','E151',
+    'E220','E221','E222','E223','E224','E228',
+    'E249','E250','E251','E252',
+    'E320','E321','E338','E339','E340','E341','E450','E451','E452',
+    'E471','E472A','E472B','E472C','E472E','E473','E475',
+    'E950','E951','E952','E954','E955','E960','E961'
+  ],
+  indus: [
+    'sirop de glucose-fructose','glucose-fructose','protéines hydrolysées',
+    'isolat de protéine','huiles hydrogénées','sirop de maïs','maltodextrine',
+    'dextrose','inuline','arômes artificiels','huile de palme'
+  ],
+  g1: ['eau','fruits','légumes','viande','poisson','œufs','lait'],
+  g2: ['huile','beurre','sucre','sel','vinaigre','miel']
+};
+
+const HIGH_RISK = new Set([
+  'E102','E110','E124','E129','E150D','E249','E250','E320','E321'
+]);
+
+type RiskLevel = 'low' | 'medium' | 'high';
+
+/* ═════════════════════════ TYPES ═════════════════════════ */
+export interface NovaAnalysis {
+  totalCount: number;
+  ultraProcessingMarkers: {
+    type: string;
+    value: string;
+    risk: RiskLevel;
+    impact: string;
+  }[];
+  industrialIngredients: string[];
+  additives: string[];
+  naturalIngredients: string[];
+  suspiciousTerms: string[];
+}
+
+export interface NovaClassification {
+  novaGroup: 1 | 2 | 3 | 4;
+  groupInfo: { name: string; group: 1 | 2 | 3 | 4 };
+  analysis: NovaAnalysis;
+  confidence: number;
+  scientificSource: string;
+  healthImpact: { level: string; risks: string[]; desc: string };
+  recommendations: string[];
+}
+
+/* ═════════════════════════ CLASSIFIER ═════════════════════════ */
 class NovaClassifier {
-  novaGroups: any;
-  ultraProcessingMarkers: any;
-  group1Ingredients: string[];
-  group2Ingredients: string[];
-
-  constructor() {
-    this.novaGroups = {
-      1: {
-        name: "Aliments non transformés ou minimalement transformés",
-        description: "Aliments naturels ou ayant subi des transformations minimales",
-        examples: ["Fruits frais", "Légumes", "Graines", "Viandes fraîches"]
-      },
-      2: {
-        name: "Ingrédients culinaires transformés", 
-        description: "Substances extraites d'aliments du groupe 1",
-        examples: ["Huiles", "Beurre", "Sucre", "Sel", "Vinaigre"]
-      },
-      3: {
-        name: "Aliments transformés",
-        description: "Aliments du groupe 1 + ingrédients du groupe 2",
-        examples: ["Pain artisanal", "Fromages", "Conserves simples"]
-      },
-      4: {
-        name: "Aliments ultra-transformés",
-        description: "Formulations industrielles avec additifs cosmétiques",
-        examples: ["Sodas", "Plats préparés", "Biscuits industriels"]
-      }
-    };
-
-    this.ultraProcessingMarkers = {
-      additives: [
-        'E102', 'E110', 'E124', 'E129', 'E131', 'E133', 'E150D', 'E151',
-        'E220', 'E221', 'E222', 'E223', 'E224', 'E228',
-        'E249', 'E250', 'E251', 'E252',
-        'E320', 'E321',
-        'E338', 'E339', 'E340', 'E341', 'E450', 'E451', 'E452',
-        'E471', 'E472A', 'E472B', 'E472C', 'E472E', 'E473', 'E475',
-        'E950', 'E951', 'E952', 'E954', 'E955', 'E960', 'E961'
-      ],
-      industrialIngredients: [
-        'sirop de glucose-fructose', 'sirop glucose-fructose', 'glucose-fructose',
-        'protéines hydrolysées', 'isolat de protéine', 'huiles hydrogénées',
-        'sirop de maïs', 'maltodextrine', 'dextrose', 'inuline', 
-        'poudres de protéines', 'arômes artificiels', 'huile de palme'
-      ],
-      industrialProcesses: [
-        'extrusion', 'pressage à chaud', 'hydrogénation', 'fractionnement',
-        'texturisation', 'soufflage', 'gélification', 'émulsification forcée'
-      ],
-      impossibleTextures: [
-        'mousses persistantes', 'gels thermorésistants', 'croustillant permanent',
-        'fondant instantané', 'texture aérée stable', 'émulsion impossible'
-      ]
-    };
-
-    this.group1Ingredients = [
-      'eau', 'fruits', 'légumes', 'graines', 'noix', 'viande', 'poisson',
-      'œufs', 'lait', 'yaourt nature', 'fromage blanc', 'légumineuses',
-      'céréales complètes', 'herbes', 'épices'
-    ];
-
-    this.group2Ingredients = [
-      'huile', 'beurre', 'sucre', 'sel', 'vinaigre', 'miel', 'sirop d\'érable'
-    ];
+  /** API asynchrone */
+  async classify(p: { title?: string; ingredients: string[] | string }) {
+    return this.classifyProduct(p);
   }
 
-  async classify(product: { title: string; ingredients: string[] | string }) {
-    return this.classifyProduct(product);
-  }
+  /** Méthode publique pour usage externe */
+  public classifyProduct(p: { title?: string; ingredients: string[] | string }): NovaClassification {
+    const ingredients =
+      Array.isArray(p.ingredients)
+        ? p.ingredients
+        : typeof p.ingredients === 'string'
+        ? this.parseList(p.ingredients)
+        : p.title
+        ? this.extractFromTitle(p.title)
+        : [];
 
-  classifyProduct(product: { title?: string; ingredients: string[] | string }) {
-    console.log('🔍 ClassifyProduct appelé avec:', product);
-
-    let ingredientsList: string[] = [];
-    
-    if (Array.isArray(product.ingredients) && product.ingredients.length > 0) {
-      ingredientsList = product.ingredients;
-      console.log('📋 Utilisation tableau ingredients:', ingredientsList);
-    } else if (typeof product.ingredients === 'string' && product.ingredients.trim()) {
-      ingredientsList = this.parseIngredientsString(product.ingredients);
-      console.log('📋 Parsing string ingredients:', ingredientsList);
-    } else if (product.title) {
-      console.log('📋 Parsing depuis title:', product.title);
-      ingredientsList = this.parseIngredientsFromText(product.title);
-      console.log('📋 Résultat parsing title:', ingredientsList);
-    }
-
-    console.log('🔍 Ingrédients détectés:', ingredientsList);
-
-    const analysis = this.analyzeIngredients(ingredientsList);
-    const novaGroup = this.determineNovaGroup(analysis);
-
-    console.log('📊 Analyse:', analysis);
-    console.log('⭐ Groupe NOVA:', novaGroup);
+    const analysis = this.analyze(ingredients);
+    const group    = this.defineGroup(analysis);
 
     return {
-      novaGroup,
-      groupInfo: this.novaGroups[novaGroup],
+      novaGroup: group,
+      groupInfo: { name: NOVA_DESC[group], group },
       analysis,
-      confidence: this.calculateConfidence(analysis),
-      scientificSource: "Classification NOVA - INSERM 2024",
-      healthImpact: this.getHealthImpact(novaGroup),
-      recommendations: this.getRecommendations(novaGroup, analysis)
+      confidence: this.computeConfidence(analysis),
+      scientificSource: 'NOVA – INSERM 2024',
+      healthImpact: this.healthImpact(group),
+      recommendations: this.recommend(group)
     };
   }
 
-  // ✅ CORRECTION MAJEURE: Méthode parseIngredientsFromText améliorée
-  parseIngredientsFromText(text: string): string[] {
-    if (!text) {
-      console.log('❌ Texte vide pour parsing');
-      return [];
-    }
-    
-    console.log('🔍 Parsing ingrédients depuis texte:', text);
-    const ingredients: string[] = [];
-    const normalizedText = text.toLowerCase();
-    
-    // ✅ CORRECTION: Chercher codes E avec regex plus robuste
-    const eCodeRegex = /e\d{3,4}[a-z]?/gi;
-    const eCodes = text.match(eCodeRegex);
-    if (eCodes) {
-      console.log('🔬 Codes E détectés:', eCodes);
-      ingredients.push(...eCodes);
-    }
-    
-    // ✅ CORRECTION: Vérifier chaque ingrédient industriel
-    this.ultraProcessingMarkers.industrialIngredients.forEach(industrial => {
-      if (normalizedText.includes(industrial.toLowerCase())) {
-        console.log(`🏭 Ingrédient industriel détecté: ${industrial}`);
-        ingredients.push(industrial);
-      }
-    });
-    
-    // ✅ CORRECTION: Recherche termes suspects améliorée
-    const suspiciousTerms = ['arôme', 'colorant', 'conservateur', 'émulsifiant', 'stabilisant', 'édulcorant'];
-    suspiciousTerms.forEach(term => {
-      if (normalizedText.includes(term)) {
-        console.log(`⚠️ Terme suspect détecté: ${term}`);
-        ingredients.push(term);
-      }
-    });
-
-    // ✅ NOUVEAU: Détection spécifique pour Coca-Cola
-    if (normalizedText.includes('coca-cola') || normalizedText.includes('soda') || normalizedText.includes('cola')) {
-      console.log('🥤 Produit cola détecté - ajout marqueurs ultra-transformation');
-      ingredients.push('soda ultra-transformé');
-    }
-    
-    console.log('✅ Ingrédients finaux extraits:', ingredients);
-    return ingredients;
+  /* ─────────── Helpers parsing ─────────── */
+  private parseList(str: string) {
+    return str.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
   }
 
-  analyzeIngredients(ingredients: string[]) {
-    console.log('🧪 Analyse des ingrédients:', ingredients);
+  private extractFromTitle(text: string) {
+    const lower = text.toLowerCase();
+    const set   = new Set<string>();
 
-    const analysis = {
-      totalCount: ingredients.length,
-      ultraProcessingMarkers: this.detectUltraProcessingMarkers(ingredients),
-      industrialIngredients: this.detectIndustrialIngredients(ingredients),
-      additives: this.detectAdditives(ingredients),
-      naturalIngredients: this.detectNaturalIngredients(ingredients),
-      suspiciousTerms: this.detectSuspiciousTerms(ingredients)
-    };
+    (text.match(/e\d{3,4}[a-z]?/gi) || []).forEach((e) => set.add(e));
+    MARKERS.indus.forEach((i) => lower.includes(i) && set.add(i));
+    ['arôme','colorant','conservateur','émulsifiant','stabilisant','édulcorant']
+      .forEach((w) => lower.includes(w) && set.add(w));
+    /coca-cola|soda|cola/i.test(lower) && set.add('soda ultra-transformé');
 
-    console.log('📋 Résultat analyse:', {
-      additives: analysis.additives,
-      industrialIngredients: analysis.industrialIngredients,
-      ultraProcessingMarkers: analysis.ultraProcessingMarkers.length
-    });
-
-    return analysis;
+    return [...set];
   }
 
-  detectUltraProcessingMarkers(ingredients: string[]) {
-    const markers: any[] = [];
+  /* ─────────── Analyse détaillée ─────────── */
+  private analyze(items: string[]): NovaAnalysis {
+    const lower = items.map((i) => i.toLowerCase());
 
-    ingredients.forEach(ingredient => {
-      const normalized = ingredient.toLowerCase().trim();
+    const additives  = this.detectAdditives(lower);
+    const industrial = lower.filter((i) => MARKERS.indus.some((m) => i.includes(m)));
+    const naturals   = lower.filter((i) => MARKERS.g1.some((g) => i.includes(g)));
+    const suspicious = lower.filter((i) => /arôme|exhausteur|stabilisant|gélifiant/.test(i));
 
-      // ✅ CORRECTION: Regex codes E plus robuste
-      const eCodeMatch = ingredient.match(/e\d{3,4}[a-z]?/gi);
-      if (eCodeMatch) {
-        eCodeMatch.forEach(eCode => {
-          const upperECode = eCode.toUpperCase();
-          console.log(`🔬 Vérification code E: ${upperECode}`);
-          if (this.ultraProcessingMarkers.additives.includes(upperECode)) {
-            console.log(`✅ Code E ultra-transformé confirmé: ${upperECode}`);
-            markers.push({
-              type: 'additive',
-              value: upperECode,
-              risk: this.getAdditiveRisk(upperECode),
-              impact: 'Marqueur ultra-transformation'
-            });
-          }
-        });
-      }
-
-      // Détecter ingrédients industriels
-      this.ultraProcessingMarkers.industrialIngredients.forEach(industrial => {
-        if (normalized.includes(industrial.toLowerCase())) {
-          console.log(`🏭 Ingrédient industriel confirmé: ${industrial}`);
-          markers.push({
-            type: 'industrial',
-            value: industrial,
-            risk: 'high',
-            impact: 'Procédé industriel complexe'
-          });
-        }
-      });
-
-      // Détecter arômes artificiels
-      if (normalized.includes('arôme') && !normalized.includes('naturel')) {
-        markers.push({
+    /* Marqueurs typés correctement */
+    const markers: NovaAnalysis['ultraProcessingMarkers'] = [
+      ...additives.map((code): NovaAnalysis['ultraProcessingMarkers'][number] => ({
+        type: 'additive',
+        value: code,
+        risk: HIGH_RISK.has(code) ? 'high' : 'medium',
+        impact: 'Marqueur ultra-transformation'
+      })),
+      ...industrial.map((val): NovaAnalysis['ultraProcessingMarkers'][number] => ({
+        type: 'industrial',
+        value: val,
+        risk: 'high',
+        impact: 'Procédé industriel'
+      })),
+      ...lower
+        .filter((v) => v.includes('arôme') && !v.includes('naturel'))
+        .map((v): NovaAnalysis['ultraProcessingMarkers'][number] => ({
           type: 'artificial_flavor',
-          value: ingredient,
+          value: v,
           risk: 'medium',
           impact: 'Arôme artificiel'
-        });
-      }
+        }))
+    ];
 
-      // ✅ NOUVEAU: Détection spécifique sodas
-      if (normalized.includes('soda') || normalized.includes('cola')) {
-        markers.push({
-          type: 'ultra_processed_category',
-          value: 'soda',
-          risk: 'high',
-          impact: 'Boisson ultra-transformée'
-        });
-      }
-    });
-
-    console.log('⚠️ Marqueurs ultra-transformation détectés:', markers);
-    return markers;
+    return {
+      totalCount: items.length,
+      ultraProcessingMarkers: markers,
+      industrialIngredients: industrial,
+      additives,
+      naturalIngredients: naturals,
+      suspiciousTerms: suspicious
+    };
   }
 
-  determineNovaGroup(analysis: any) {
-    console.log('🎯 Déterminant groupe NOVA avec:', {
-      ultraProcessingMarkers: analysis.ultraProcessingMarkers.length,
-      additives: analysis.additives.length,
-      industrialIngredients: analysis.industrialIngredients.length
+  private detectAdditives(list: string[]) {
+    const set = new Set<string>();
+    list.forEach((l) => {
+      const m = l.match(/e\d{3,4}[a-z]?/gi);
+      m && m.forEach((e) => set.add(e.toUpperCase()));
     });
+    return [...set];
+  }
 
-    // ✅ CORRECTION: Logique NOVA 4 encore plus stricte
-    if (analysis.ultraProcessingMarkers.length > 0 || 
-        analysis.additives.length > 0 || 
-        analysis.industrialIngredients.length > 0) {
-      console.log('🔴 NOVA 4 détecté: Ultra-transformé');
-      return 4;
-    }
-
-    if (analysis.totalCount > 5) {
-      console.log('🟡 NOVA 3 détecté: Nombreux ingrédients');
-      return 3;
-    }
-
-    if (this.isMainlyCulinaryIngredients(analysis)) {
-      console.log('🟠 NOVA 2 détecté: Ingrédients culinaires');
-      return 2;
-    }
-
-    console.log('🟢 NOVA 1 détecté: Naturel');
+  /* ─────────── Calcul groupe & confiance ─────────── */
+  private defineGroup(a: NovaAnalysis): 1 | 2 | 3 | 4 {
+    if (a.ultraProcessingMarkers.length) return 4;
+    if (a.totalCount > 5)                return 3;
+    if (!a.naturalIngredients.length && !a.additives.length && a.totalCount <= 2) return 2;
     return 1;
   }
 
-  calculateConfidence(analysis: any) {
-    let confidence = 0.8;
-
-    if (analysis.ultraProcessingMarkers.length > 2) confidence += 0.15;
-    if (analysis.additives.length > 3) confidence += 0.1;
-
-    if (analysis.totalCount < 3) confidence -= 0.1;
-    if (analysis.suspiciousTerms.length > 0) confidence -= 0.05;
-
-    return Math.min(0.95, Math.max(0.6, confidence));
+  private computeConfidence(a: NovaAnalysis) {
+    let c = 0.8;
+    if (a.ultraProcessingMarkers.length > 2) c += 0.15;
+    if (a.additives.length > 3)              c += 0.1;
+    if (a.totalCount < 3)                    c -= 0.1;
+    if (a.suspiciousTerms.length)            c -= 0.05;
+    return Math.min(0.95, Math.max(0.6, c));
   }
 
-  getHealthImpact(novaGroup: number) {
-    const impacts = {
-      1: {
-        level: 'positive',
-        description: 'Bénéfique pour la santé',
-        risks: [],
-        benefits: ['Haute densité nutritionnelle', 'Fibres naturelles', 'Antioxydants']
-      },
-      2: {
-        level: 'neutral',
-        description: 'Neutre si consommation modérée',
-        risks: ['Calories concentrées'],
-        benefits: ['Praticité culinaire']
-      },
-      3: {
-        level: 'moderate',
-        description: 'Acceptable en quantité limitée',
-        risks: ['Sodium élevé possible', 'Conservateurs'],
-        benefits: ['Praticité', 'Conservation']
-      },
-      4: {
-        level: 'high_risk',
-        description: 'À limiter fortement',
-        risks: [
-          '+22% risque dépression (Nature 2024)',
-          '+53% risque diabète type 2 (BMJ 2024)',
-          '+10% maladies cardiovasculaires (Lancet 2024)',
-          'Perturbation microbiote intestinal'
-        ],
-        benefits: []
-      }
-    };
-
-    return impacts[novaGroup as keyof typeof impacts];
-  }
-
-  getRecommendations(novaGroup: number, analysis: any) {
-    if (novaGroup === 4) {
-      return {
-        action: 'replace',
-        urgency: 'high',
-        message: 'Remplacer par alternative naturelle',
-        alternatives: this.suggestNaturalAlternatives(analysis),
-        educationalTip: 'L\'ultra-transformation détruit la matrice alimentaire et ajoute des substances non alimentaires.'
-      };
-    }
-
-    if (novaGroup === 3) {
-      return {
-        action: 'moderate',
-        urgency: 'medium',
-        message: 'Consommer occasionnellement',
-        alternatives: [],
-        educationalTip: 'Privilégier la version maison quand possible.'
-      };
-    }
-
+  /* ─────────── Impact & reco ─────────── */
+  private healthImpact(g: 1 | 2 | 3 | 4) {
     return {
-      action: 'enjoy',
-      urgency: 'low',
-      message: 'Excellent choix nutritionnel',
-      alternatives: [],
-      educationalTip: 'Les aliments peu transformés préservent leurs qualités nutritionnelles.'
-    };
+      1: { level: 'positive',  risks: [], desc: 'Bénéfique pour la santé' },
+      2: { level: 'neutral',   risks: ['Calories concentrées'], desc: 'Neutre si modéré' },
+      3: { level: 'moderate',  risks: ['Sodium','Conservateurs'], desc: 'Consommation à limiter' },
+      4: { level: 'high_risk', risks: ['↑ diabète','↑ cardio'], desc: 'À limiter fortement' }
+    }[g];
   }
 
-  suggestNaturalAlternatives(_analysis: any) {
-    return [
-      'Eau pétillante avec citron naturel',
-      'Jus de fruits frais sans sucre ajouté',
-      'Kombucha naturel fermenté'
-    ];
-  }
-
-  parseIngredientsString(ingredientsStr: string) {
-    if (!ingredientsStr) return [];
-    return ingredientsStr
-      .split(/[,;]/)
-      .map(ing => ing.trim())
-      .filter(ing => ing.length > 0);
-  }
-
-  detectAdditives(ingredients: string[]) {
-    const additives: string[] = [];
-    ingredients.forEach(ingredient => {
-      const eCodeMatch = ingredient.match(/e\d{3,4}[a-z]?/gi);
-      if (eCodeMatch) {
-        additives.push(...eCodeMatch.map(e => e.toUpperCase()));
-      }
-    });
-    return [...new Set(additives)];
-  }
-
-  detectIndustrialIngredients(ingredients: string[]) {
-    return ingredients.filter(ingredient =>
-      this.ultraProcessingMarkers.industrialIngredients.some(industrial =>
-        ingredient.toLowerCase().includes(industrial.toLowerCase())
-      )
-    );
-  }
-
-  detectNaturalIngredients(ingredients: string[]) {
-    return ingredients.filter(ingredient =>
-      this.group1Ingredients.some(natural =>
-        ingredient.toLowerCase().includes(natural.toLowerCase())
-      )
-    );
-  }
-
-  detectSuspiciousTerms(ingredients: string[]) {
-    const suspicious = ['arôme', 'exhausteur', 'stabilisant', 'gélifiant', 'épaississant'];
-    return ingredients.filter(ingredient =>
-      suspicious.some(term => ingredient.toLowerCase().includes(term))
-    );
-  }
-
-  getAdditiveRisk(eCode: string) {
-    const highRisk = ['E102', 'E110', 'E124', 'E129', 'E150D', 'E249', 'E250', 'E320', 'E321'];
-    const mediumRisk = ['E471', 'E472A', 'E951', 'E952'];
-    if (highRisk.includes(eCode)) return 'high';
-    if (mediumRisk.includes(eCode)) return 'medium';
-    return 'low';
-  }
-
-  isMainlyCulinaryIngredients(analysis: any) {
-    return analysis.naturalIngredients.length === 0 &&
-      analysis.additives.length === 0 &&
-      analysis.totalCount <= 2;
+  private recommend(g: 1 | 2 | 3 | 4): string[] {
+    if (g === 4) return ['🚨 Ultra-transformé : remplacez-le par une alternative naturelle.'];
+    if (g === 3) return ['⚠️ À consommer occasionnellement.'];
+    if (g === 2) return ['👍 Utilisez en quantité modérée.'];
+    return ['✅ Excellent choix !'];
   }
 }
 
+/* ═════════════════════════ EXPORTS ═════════════════════════ */
 export default NovaClassifier;
+export const novaClassifier = new NovaClassifier();
 // EOF

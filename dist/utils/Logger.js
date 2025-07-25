@@ -1,26 +1,32 @@
 "use strict";
-// backend/src/utils/Logger.ts
+// PATH: backend/src/utils/Logger.ts
+/**
+ * Logger minimaliste (console) mais maintenant compatible
+ * avec les appels type `log.info(...args: unknown[])`.
+ */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.logger = exports.Logger = void 0;
 class Logger {
     constructor(context = 'App') {
         this.context = context;
     }
-    info(message, meta) {
-        console.log(`[${new Date().toISOString()}] INFO [${this.context}]: ${message}`, meta || '');
+    /* --- Méthodes – acceptent un nombre variable d’arguments --- */
+    info(...args) {
+        console.log(`[${new Date().toISOString()}] INFO  [${this.context}]`, ...args);
     }
-    error(message, meta) {
-        console.error(`[${new Date().toISOString()}] ERROR [${this.context}]: ${message}`, meta || '');
+    warn(...args) {
+        console.warn(`[${new Date().toISOString()}] WARN  [${this.context}]`, ...args);
     }
-    warn(message, meta) {
-        console.warn(`[${new Date().toISOString()}] WARN [${this.context}]: ${message}`, meta || '');
+    error(...args) {
+        console.error(`[${new Date().toISOString()}] ERROR [${this.context}]`, ...args);
     }
-    debug(message, meta) {
+    debug(...args) {
         if (process.env.NODE_ENV === 'development') {
-            console.debug(`[${new Date().toISOString()}] DEBUG [${this.context}]: ${message}`, meta || '');
+            console.debug(`[${new Date().toISOString()}] DEBUG [${this.context}]`, ...args);
         }
     }
 }
 exports.Logger = Logger;
-// Export une instance par défaut si besoin
+/* Singleton pratique — optionnel */
 exports.logger = new Logger('Ecolojia');
+// EOF

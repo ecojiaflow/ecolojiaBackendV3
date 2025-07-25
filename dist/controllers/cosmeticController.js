@@ -1,37 +1,64 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.analyzeCosmeticController = void 0;
-const cosmeticClassifier_1 = require("../services/ai/cosmeticClassifier");
+const cosmeticsAnalyzer_1 = require("../services/ai/cosmeticsAnalyzer");
+const HealthScoreCalculator_1 = require("../services/ai/HealthScoreCalculator"); // H majuscule
 const analyzeCosmeticController = async (req, res) => {
     try {
-        const { ingredients, productType = 'general', productName } = req.body;
-        // Validation des ingrédients
-        if (!ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
+        const { ingredients, inciList, productType = 'general', productName } = req.body;
+        // Parsing flexible des ingrédients
+        let ingredientsList = [];
+        if (inciList) {
+            ingredientsList = inciList
+                .split(',')
+                .map((i) => i.trim())
+                .filter((i) => i.length > 0);
+        }
+        else if (ingredients) {
+            if (typeof ingredients === 'string') {
+                ingredientsList = ingredients
+                    .split(',')
+                    .map((i) => i.trim())
+                    .filter((i) => i.length > 0);
+            }
+            else if (Array.isArray(ingredients)) {
+                ingredientsList = ingredients;
+            }
+        }
+        if (ingredientsList.length === 0) {
             return res.status(400).json({
                 error: 'Liste d\'ingrédients requise',
-                code: 'MISSING_INGREDIENTS'
+                code: 'MISSING_INGREDIENTS',
+                help: 'Envoyer ingredients (string ou array) ou inciList (string)'
             });
         }
-        console.log(`💄 Analyse cosmétique: ${productName || 'Produit sans nom'} (${ingredients.length} ingrédients)`);
-        // Analyse selon le type de produit
-        let analysis;
-        switch (productType) {
-            case 'skincare':
-                analysis = await cosmeticClassifier_1.CosmeticClassifier.analyzeSkinCare(ingredients);
-                break;
-            case 'haircare':
-                analysis = await cosmeticClassifier_1.CosmeticClassifier.analyzeHairCare(ingredients);
-                break;
-            default:
-                analysis = await cosmeticClassifier_1.CosmeticClassifier.analyzeIngredients(ingredients);
-        }
+        console.log(`💄 Analyse cosmétique: ${productName || 'Produit sans nom'} (${ingredientsList.length} ingrédients)`);
+        // Utiliser le cosmeticsAnalyzer existant
+        const inciAnalysis = await cosmeticsAnalyzer_1.cosmeticsAnalyzer.analyzeINCI(ingredientsList);
+        // Adapter pour healthScoreCalculator
+        const healthScore = HealthScoreCalculator_1.healthScoreCalculator.calculate({
+            category: 'cosmetics',
+            productName: productName || 'Produit cosmétique',
+            ingredients: ingredientsList,
+            cosmeticsAnalysis: {
+                hazardScore: inciAnalysis.hazardScore,
+                endocrineDisruptors: inciAnalysis.endocrineDisruptors,
+                allergens: inciAnalysis.allergens,
+                naturalityScore: inciAnalysis.naturalityScore
+            }
+        });
         res.json({
             success: true,
             data: {
                 productName: productName || 'Produit cosmétique',
                 productType,
-                ingredientCount: ingredients.length,
-                analysis,
+                ingredientCount: ingredientsList.length,
+                healthScore: {
+                    score: healthScore.score,
+                    category: healthScore.category
+                },
+                analysis: inciAnalysis,
+                recommendations: healthScore.recommendations,
                 timestamp: new Date().toISOString(),
                 source: 'cosmetic_analysis'
             }
