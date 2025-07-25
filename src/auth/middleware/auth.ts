@@ -50,7 +50,7 @@ export const authenticate = async (
     req.user = {
       id: decoded.userId,
       email: decoded.email,
-      tier: decoded.tier || 'free'
+      tier: (decoded.tier as 'free' | 'premium') || 'free'
     };
 
     log.info(`Utilisateur authentifié: ${decoded.email}`);
@@ -128,7 +128,7 @@ export const optionalAuth = async (
         req.user = {
           id: decoded.userId,
           email: decoded.email,
-          tier: decoded.tier || 'free'
+          tier: (decoded.tier as 'free' | 'premium') || 'free'
         };
       }
     }
