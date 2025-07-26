@@ -5,13 +5,20 @@
 // ==============================
 
 import express, { Request, Response, NextFunction } from 'express';
-import { cacheAuthMiddleware as authMiddleware, CacheAuthRequest } from '../middleware/cacheAuthMiddleware';
+import { cacheAuthMiddleware } from '../middleware/cacheAuthMiddleware';
 import { mongoDBService } from '../services/MongoDBService';
 import { AnalysisCache } from '../models/AnalysisCache';
 import { UserAnalytics } from '../models/UserAnalytics';
 import { User } from '../models/User';
+import { CacheUser } from '../types/cacheTypes';
 
 const router = express.Router();
+
+// Interface étendue pour les requêtes authentifiées
+interface AuthRequest extends Request {
+  cacheUser?: CacheUser;
+  cacheSession?: any;
+}
 
 // ==============================
 // SYSTÈME DE QUOTA EN MÉMOIRE
@@ -52,7 +59,7 @@ const DAILY_LIMITS = {
 // UTILITAIRES QUOTA
 // ==============================
 
-function getUserId(req: Request | CacheAuthRequest): string {
+function getUserId(req: Request | AuthRequest): string {
   // Si c'est une requête authentifiée avec cacheAuthMiddleware
   if ('cacheUser' in req && req.cacheUser) {
     return req.cacheUser.id;
@@ -169,7 +176,7 @@ router.get('/quota', async (req: Request, res: Response) => {
 // Route pour obtenir les infos utilisateur
 // ==============================
 
-router.get('/me', authMiddleware, async (req: CacheAuthRequest, res: Response) => {
+router.get('/me', cacheAuthMiddleware as any, async (req: AuthRequest, res: Response) => {
   try {
     if (!req.cacheUser) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -203,7 +210,7 @@ router.get('/me', authMiddleware, async (req: CacheAuthRequest, res: Response) =
 // ==============================
 
 // Route pour sauvegarder une analyse dans l'historique
-router.post('/history', authMiddleware, async (req: CacheAuthRequest, res: Response) => {
+router.post('/history', cacheAuthMiddleware as any, async (req: AuthRequest, res: Response) => {
   try {
     if (!req.cacheUser) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -248,7 +255,7 @@ router.post('/history', authMiddleware, async (req: CacheAuthRequest, res: Respo
 });
 
 // Route pour récupérer l'historique
-router.get('/history', authMiddleware, async (req: CacheAuthRequest, res: Response) => {
+router.get('/history', cacheAuthMiddleware as any, async (req: AuthRequest, res: Response) => {
   try {
     if (!req.cacheUser) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -300,7 +307,7 @@ router.get('/history', authMiddleware, async (req: CacheAuthRequest, res: Respon
 // ==============================
 
 // Route pour obtenir le statut de l'abonnement
-router.get('/subscription-status', authMiddleware, async (req: CacheAuthRequest, res: Response) => {
+router.get('/subscription-status', cacheAuthMiddleware as any, async (req: AuthRequest, res: Response) => {
   try {
     if (!req.cacheUser) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -330,7 +337,7 @@ router.get('/subscription-status', authMiddleware, async (req: CacheAuthRequest,
 // ==============================
 
 // Route pour obtenir les analytics utilisateur
-router.get('/analytics', authMiddleware, async (req: CacheAuthRequest, res: Response) => {
+router.get('/analytics', cacheAuthMiddleware as any, async (req: AuthRequest, res: Response) => {
   try {
     if (!req.cacheUser) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -353,7 +360,7 @@ router.get('/analytics', authMiddleware, async (req: CacheAuthRequest, res: Resp
 // ==============================
 
 // Route pour mettre à jour les préférences utilisateur
-router.put('/preferences', authMiddleware, async (req: CacheAuthRequest, res: Response) => {
+router.put('/preferences', cacheAuthMiddleware as any, async (req: AuthRequest, res: Response) => {
   try {
     if (!req.cacheUser) {
       return res.status(401).json({ error: 'Not authenticated' });
