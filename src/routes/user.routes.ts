@@ -1,10 +1,11 @@
+// PATH: backend/src/routes/user.routes.ts
 // ==============================
 // 📁 backend/src/routes/user.routes.ts
 // SYSTÈME DE QUOTA ET GESTION UTILISATEUR ECOLOJIA
 // ==============================
 
 import express, { Request, Response, NextFunction } from 'express';
-import { authMiddleware } from '../middleware/authMiddleware';
+import { cacheAuthMiddleware as authMiddleware } from '../middleware/cacheAuthMiddleware';
 import { mongoDBService } from '../services/MongoDBService';
 import { AnalysisCache } from '../models/AnalysisCache';
 import { UserAnalytics } from '../models/UserAnalytics';
@@ -21,6 +22,15 @@ interface UserQuota {
   chat: number;
   lastReset: string;
   plan: 'free' | 'premium';
+}
+
+interface QuotaCheck {
+  allowed: boolean;
+  remaining: number;
+  resetDate: Date;
+  used?: number;
+  limit?: number;
+  plan?: 'free' | 'premium';
 }
 
 // Structure : { userId: { analyses: 5, lastReset: '2025-07-13', chat: 20 } }
@@ -89,7 +99,7 @@ router.get('/quota', async (req: Request, res: Response) => {
     // Si l'utilisateur est authentifié, vérifier aussi dans MongoDB
     if (req.headers.authorization) {
       try {
-        const quotaCheck = await mongoDBService.checkUserQuota(userId, 'analyses');
+        const quotaCheck = await mongoDBService.checkUserQuota(userId, 'analyses') as QuotaCheck;
         return res.json({
           success: true,
           allowed: quotaCheck.allowed,
@@ -146,6 +156,36 @@ router.get('/quota', async (req: Request, res: Response) => {
         plan: 'free'
       }
     });
+  }
+});
+
+// ==============================
+// ROUTE GET /api/user/me
+// Route pour obtenir les infos utilisateur
+// ==============================
+
+router.get('/me', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    
+    const user = await User.findById(userId).select('-password');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        tier: user.tier || 'free',
+        createdAt: user.createdAt,
+        preferences: (user as any).preferences || {}
+      }
+    });
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({ error: 'Failed to get user info' });
   }
 });
 
@@ -295,13 +335,13 @@ router.put('/preferences', authMiddleware, async (req: Request, res: Response) =
     
     const user = await User.findByIdAndUpdate(
       userId,
-      { preferences },
+      { $set: { preferences } },
       { new: true }
     );
     
     res.json({
       success: true,
-      preferences: user?.preferences
+      preferences: (user as any)?.preferences || {}
     });
   } catch (error) {
     console.error('Update preferences error:', error);
