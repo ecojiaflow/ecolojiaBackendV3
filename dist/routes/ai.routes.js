@@ -15,6 +15,7 @@ const log = new Logger_1.Logger('AIRoutes');
 // ═══════════════════════════════════════════════════════════════════════
 router.post('/analyze', auth_1.authenticate, async (req, res) => {
     try {
+        const authReq = req;
         const { productName, category, ingredients, barcode, useDeepSeek, customPrompt } = req.body;
         // Validation
         if (!productName || !category) {
@@ -31,7 +32,7 @@ router.post('/analyze', auth_1.authenticate, async (req, res) => {
                 code: 'INVALID_CATEGORY'
             });
         }
-        log.info(`Analyse demandée: ${productName} (${category}) par ${req.user.email}`);
+        log.info(`Analyse demandée: ${productName} (${category}) par ${authReq.user.email}`);
         // Analyse
         const result = await AIAnalysisService_1.aiAnalysisService.analyzeProduct({
             productName,
@@ -42,9 +43,9 @@ router.post('/analyze', auth_1.authenticate, async (req, res) => {
                     : ingredients
                 : undefined,
             barcode,
-            userId: req.user.id,
-            userTier: req.user.tier,
-            useDeepSeek: useDeepSeek && req.user.tier === 'premium',
+            userId: authReq.user.id,
+            userTier: authReq.user.tier,
+            useDeepSeek: useDeepSeek && authReq.user.tier === 'premium',
             customPrompt
         });
         // Réponse
@@ -52,8 +53,8 @@ router.post('/analyze', auth_1.authenticate, async (req, res) => {
             success: true,
             data: result,
             user: {
-                id: req.user.id,
-                tier: req.user.tier
+                id: authReq.user.id,
+                tier: authReq.user.tier
             }
         });
     }
@@ -115,6 +116,7 @@ router.post('/quick-analyze', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════
 router.get('/history', auth_1.authenticate, async (req, res) => {
     try {
+        const authReq = req;
         const { limit = 10, offset = 0 } = req.query;
         // TODO: Implémenter récupération depuis DB
         const history = {
@@ -141,6 +143,7 @@ router.get('/history', auth_1.authenticate, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════
 router.get('/analysis/:id', auth_1.authenticate, async (req, res) => {
     try {
+        const authReq = req;
         const { id } = req.params;
         // TODO: Récupérer depuis cache ou DB
         // Vérifier que l'analyse appartient à l'utilisateur
@@ -163,6 +166,7 @@ router.get('/analysis/:id', auth_1.authenticate, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════
 router.post('/export/:id', auth_1.authenticate, async (req, res) => {
     try {
+        const authReq = req;
         const { id } = req.params;
         const { format = 'pdf' } = req.body;
         // TODO: Implémenter génération PDF/CSV

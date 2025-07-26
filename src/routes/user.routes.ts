@@ -1,17 +1,25 @@
 // ==============================
-// 📁 backend/src/routes/user.routes.js
+// 📁 backend/src/routes/user.routes.ts
 // SYSTÈME DE QUOTA ECOLOJIA
 // ==============================
 
-const express = require('express');
+import express, { Request, Response, NextFunction } from 'express';
+
 const router = express.Router();
 
 // ==============================
 // SYSTÈME DE QUOTA EN MÉMOIRE
 // ==============================
 
+interface UserQuota {
+  analyses: number;
+  chat: number;
+  lastReset: string;
+  plan: 'free' | 'premium';
+}
+
 // Structure : { userId: { analyses: 5, lastReset: '2025-07-13', chat: 20 } }
-const userQuotas = new Map();
+const userQuotas = new Map<string, UserQuota>();
 
 // Limites par défaut
 const DAILY_LIMITS = {
@@ -29,21 +37,21 @@ const DAILY_LIMITS = {
 // UTILITAIRES QUOTA
 // ==============================
 
-function getUserId(req) {
+function getUserId(req: Request): string {
   // Utilisateur authentifié ou anonyme
   return req.headers.authorization?.replace('Bearer ', '') || 
-         req.headers['x-anonymous-id'] || 
+         (req.headers['x-anonymous-id'] as string) || 
          'anonymous_' + Date.now();
 }
 
-function getTodayString() {
+function getTodayString(): string {
   return new Date().toISOString().split('T')[0];
 }
 
-function initUserQuota(userId) {
+function initUserQuota(userId: string): UserQuota {
   const today = getTodayString();
   
-  if (!userQuotas.has(userId) || userQuotas.get(userId).lastReset !== today) {
+  if (!userQuotas.has(userId) || userQuotas.get(userId)!.lastReset !== today) {
     userQuotas.set(userId, {
       analyses: 0,
       chat: 0,
@@ -52,10 +60,10 @@ function initUserQuota(userId) {
     });
   }
   
-  return userQuotas.get(userId);
+  return userQuotas.get(userId)!;
 }
 
-function getResetTime() {
+function getResetTime(): string {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   tomorrow.setHours(0, 0, 0, 0);
@@ -66,7 +74,7 @@ function getResetTime() {
 // ROUTE GET /api/user/quota
 // ==============================
 
-router.get('/quota', (req, res) => {
+router.get('/quota', (req: Request, res: Response) => {
   try {
     console.log('📊 Demande quota utilisateur');
     
@@ -114,7 +122,7 @@ router.get('/quota', (req, res) => {
 // MIDDLEWARE VÉRIFICATION QUOTA
 // ==============================
 
-function checkAnalysisQuota(req, res, next) {
+export function checkAnalysisQuota(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = getUserId(req);
     const userQuota = initUserQuota(userId);
@@ -146,7 +154,7 @@ function checkAnalysisQuota(req, res, next) {
   }
 }
 
-function checkChatQuota(req, res, next) {
+export function checkChatQuota(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = getUserId(req);
     const userQuota = initUserQuota(userId);
@@ -181,8 +189,8 @@ function checkChatQuota(req, res, next) {
 // ROUTE DEBUG (optionnelle)
 // ==============================
 
-router.get('/quota/debug', (req, res) => {
-  const allQuotas = {};
+router.get('/quota/debug', (req: Request, res: Response) => {
+  const allQuotas: any = {};
   userQuotas.forEach((quota, userId) => {
     allQuotas[userId.substring(0, 10) + '...'] = quota;
   });
@@ -196,9 +204,7 @@ router.get('/quota/debug', (req, res) => {
 });
 
 // ==============================
-// EXPORTS
+// EXPORT DEFAULT
 // ==============================
 
-module.exports = router;
-module.exports.checkAnalysisQuota = checkAnalysisQuota;
-module.exports.checkChatQuota = checkChatQuota;
+export default router;

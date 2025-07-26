@@ -1,143 +1,80 @@
 "use strict";
-// PATH: backend/src/app.ts
-// -----------------------------------------------------------------------------
-//  ECOLOJIA – Configuration dʼExpress (version complète corrigée)
-//  Ce fichier expose désormais les routes IA (/api/ai) tout en conservant :
-//  • Auth + validation email + rate‑limit
-//  • Routes produits / scan / cosmetic / detergent / admin
-//  • Sécurité CORS / Helmet
-// -----------------------------------------------------------------------------
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+// PATH: src/app.ts
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
-const dotenv_1 = __importDefault(require("dotenv"));
 const morgan_1 = __importDefault(require("morgan"));
-const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
-const cookie_parser_1 = __importDefault(require("cookie-parser"));
-// ───────────────────────────────  ROUTES  ────────────────────────────────────
-const product_routes_1 = __importDefault(require("./routes/product.routes"));
-const scan_routes_1 = __importDefault(require("./routes/scan.routes"));
-const cosmetic_routes_1 = __importDefault(require("./routes/cosmetic.routes"));
-const detergent_routes_1 = __importDefault(require("./routes/detergent.routes"));
-const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
-const auth_1 = __importDefault(require("./routes/auth"));
-const emailValidation_1 = __importDefault(require("./routes/emailValidation"));
-const ai_routes_1 = __importDefault(require("./routes/ai.routes")); // ✅ NOUVELLE ROUTE IA
-// ─────────────────────────────  INITIALISATION  ──────────────────────────────
+const dotenv_1 = __importDefault(require("dotenv"));
+const mongoose_1 = __importDefault(require("mongoose"));
+const body_parser_1 = __importDefault(require("body-parser"));
 dotenv_1.default.config();
+// 🔒 Sécurité + logs
 const app = (0, express_1.default)();
-// ───────────────────────────────  MIDDLEWARES  ───────────────────────────────
-const authLimiter = (0, express_rate_limit_1.default)({
-    windowMs: 15 * 60 * 1000,
-    max: 10,
-    message: {
-        success: false,
-        message: 'Trop de tentatives depuis cette IP, réessayez dans 15 minutes'
-    },
-    standardHeaders: true,
-    legacyHeaders: false
-});
-app.use((0, cors_1.default)({
-    origin: process.env.NODE_ENV === 'production'
-        ? [
-            'https://ecolojia-v3.netlify.app',
-            'https://ecolojia-backend-working.onrender.com'
-        ]
-        : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:3001'],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
-app.use((0, helmet_1.default)({
-    crossOriginEmbedderPolicy: false,
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
-            scriptSrc: ["'self'"],
-            imgSrc: ["'self'", 'data:', 'https:']
-        }
-    }
-}));
+app.use((0, helmet_1.default)());
+app.use((0, cors_1.default)());
 app.use((0, morgan_1.default)('dev'));
-app.use(express_1.default.json({ limit: '10mb' }));
-app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
-app.use((0, cookie_parser_1.default)());
-// ────────────────────────────────  ROUTES  ───────────────────────────────────
-app.get('/', (_req, res) => {
-    res.json({
-        name: 'ECOLOJIA – Assistant IA',
-        version: '2.1.1',
-        status: 'operational',
-        description: 'Plateforme scientifique multi‑catégories pour une consommation responsable',
-        endpoints: {
-            health: '/api/health',
-            auth: {
-                health: 'GET /api/auth/health',
-                register: 'POST /api/auth/register',
-                login: 'POST /api/auth/login',
-                profile: 'GET /api/auth/me',
-                logout: 'POST /api/auth/logout'
-            },
-            emailValidation: {
-                verify: 'POST /api/email-validation/verify',
-                resend: 'POST /api/email-validation/resend',
-                status: 'GET /api/email-validation/status/:email'
-            },
-            products: {
-                analyze: 'POST /api/products/analyze',
-                status: 'GET /api/products/status'
-            },
-            scan: 'POST /api/scan/barcode',
-            cosmetic: 'POST /api/cosmetic/analyze',
-            detergent: 'POST /api/detergent/analyze',
-            ai: {
-                analyze: 'POST /api/ai/analyze'
-            },
-            admin: {
-                dashboard: 'GET /api/admin/dashboard'
-            }
+// 🔧 Middlewares
+app.use(body_parser_1.default.json());
+app.use(body_parser_1.default.urlencoded({ extended: true }));
+// ✅ Fonction de connexion MongoDB améliorée
+const connectMongoDB = async () => {
+    try {
+        const uri = process.env.MONGODB_URI;
+        if (!uri) {
+            throw new Error('MONGODB_URI is not defined in environment variables');
         }
-    });
-});
-// HEALTH
-app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-// AUTH & EMAIL
-app.use('/api/auth', authLimiter, auth_1.default);
-app.use('/api/email-validation', authLimiter, emailValidation_1.default);
-// ANALYSES PRODUITS
+        await mongoose_1.default.connect(uri);
+        console.log('✅ MongoDB Atlas connected successfully');
+        console.log(`📍 Connected to database: ${mongoose_1.default.connection.db?.databaseName || 'ecolojia'}`);
+        // Event listeners pour monitoring
+        mongoose_1.default.connection.on('error', (error) => {
+            console.error('❌ MongoDB connection error:', error);
+        });
+        mongoose_1.default.connection.on('disconnected', () => {
+            console.warn('⚠️ MongoDB disconnected');
+        });
+    }
+    catch (error) {
+        console.error('❌ Failed to connect to MongoDB:', error);
+        // Ne pas faire process.exit(1) ici pour permettre au serveur de démarrer
+        // même si MongoDB n'est pas disponible immédiatement
+    }
+};
+// ✅ Connexion MongoDB au démarrage
+connectMongoDB();
+// ✅ Routes
+const auth_1 = __importDefault(require("./routes/auth"));
+const multiCategory_routes_1 = __importDefault(require("./routes/multiCategory.routes"));
+const product_routes_1 = __importDefault(require("./routes/product.routes"));
+const user_routes_1 = __importDefault(require("./routes/user.routes"));
+const payment_routes_1 = __importDefault(require("./routes/payment.routes"));
+app.use('/api/auth', auth_1.default);
 app.use('/api/products', product_routes_1.default);
-app.use('/api/scan', scan_routes_1.default);
-app.use('/api/cosmetic', cosmetic_routes_1.default);
-app.use('/api/detergent', detergent_routes_1.default);
-app.use('/api/ai', ai_routes_1.default); // ✅ ROUTES IA EXPOSÉES
-// ADMIN
-app.use('/api/admin', admin_routes_1.default);
-// 404 – catch‑all
-app.use('*', (req, res) => {
-    res.status(404).json({
-        success: false,
-        error: 'Route non trouvée',
-        message: `L'endpoint ${req.originalUrl} n'existe pas sur le serveur ECOLOJIA`,
-        suggestion: 'Consultez GET / pour la liste complète des endpoints',
+app.use('/api/categories', multiCategory_routes_1.default);
+app.use('/api/user', user_routes_1.default);
+app.use('/api/payment', payment_routes_1.default);
+// Route de santé pour vérifier le statut
+app.get('/api/health', (req, res) => {
+    const mongoStatus = mongoose_1.default.connection.readyState === 1 ? 'connected' : 'disconnected';
+    res.json({
+        status: 'ok',
+        mongodb: mongoStatus,
         timestamp: new Date().toISOString()
     });
 });
-// ERROR HANDLER
-app.use((err, _req, res, _next) => {
-    console.error('❌ Erreur serveur non gérée:', err);
+// Gestion des erreurs 404
+app.use((req, res) => {
+    res.status(404).json({ error: 'Route not found' });
+});
+// Gestion des erreurs globales
+app.use((err, req, res, next) => {
+    console.error('Error:', err);
     res.status(err.status || 500).json({
-        success: false,
-        error: 'Erreur serveur',
-        message: process.env.NODE_ENV === 'production' ? 'Erreur interne' : err.message,
-        timestamp: new Date().toISOString()
+        error: err.message || 'Internal server error'
     });
 });
 exports.default = app;
-// EOF

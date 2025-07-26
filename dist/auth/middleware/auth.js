@@ -1,130 +1,111 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.adminAuth = exports.optionalAuth = exports.authenticate = void 0;
-const client_1 = require("@prisma/client");
+exports.optionalAuth = exports.requirePremium = exports.authenticate = void 0;
 const jwt_1 = require("../utils/jwt");
 const Logger_1 = require("../../utils/Logger");
-const prisma = new client_1.PrismaClient();
 const log = new Logger_1.Logger('AuthMiddleware');
-/**
- * Middleware d'authentification unifié
- * Utilise les utilitaires JWT du projet
- */
+// Middleware d'authentification principal
 const authenticate = async (req, res, next) => {
     try {
-        // 1. Extraction du token
+        // Récupération du token depuis le header Authorization
         const authHeader = req.headers.authorization;
-        const token = authHeader?.startsWith('Bearer ')
-            ? authHeader.substring(7)
-            : authHeader;
+        const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
         if (!token) {
-            log.warn('Token manquant dans la requête');
             res.status(401).json({
                 success: false,
-                message: 'Token manquant',
-                code: 'MISSING_TOKEN'
+                message: 'Token d\'authentification requis',
+                code: 'NO_TOKEN'
             });
             return;
         }
-        // 2. Vérification JWT avec l'utilitaire
-        let decoded;
-        try {
-            decoded = (0, jwt_1.verifyToken)(token);
-        }
-        catch (jwtError) {
-            log.warn(`JWT invalide: ${jwtError.message}`);
+        // Vérification du token
+        const decoded = await (0, jwt_1.verifyToken)(token);
+        if (!decoded) {
             res.status(401).json({
                 success: false,
-                message: 'Token invalide',
-                code: 'INVALID_TOKEN',
-                details: process.env.NODE_ENV === 'development' ? jwtError.message : undefined
+                message: 'Token invalide ou expiré',
+                code: 'INVALID_TOKEN'
             });
             return;
         }
-        // 3. Récupération utilisateur avec Prisma
-        const user = await prisma.user.findUnique({
-            where: { id: decoded.userId },
-            select: {
-                id: true,
-                email: true,
-                name: true,
-                emailVerified: true,
-                createdAt: true
-            }
-        });
-        if (!user) {
-            log.warn(`Utilisateur non trouvé: ${decoded.userId}`);
-            res.status(401).json({
-                success: false,
-                message: 'Utilisateur non trouvé',
-                code: 'USER_NOT_FOUND'
-            });
-            return;
-        }
-        // 4. Vérification email (peut être désactivée selon les besoins)
-        if (!user.emailVerified && process.env.REQUIRE_EMAIL_VERIFICATION === 'true') {
-            log.warn(`Email non vérifié pour: ${user.email}`);
-            res.status(403).json({
-                success: false,
-                message: 'Email non vérifié',
-                code: 'EMAIL_NOT_VERIFIED',
-                emailVerificationRequired: true
-            });
-            return;
-        }
-        // 5. Déterminer le tier
-        const tier = decoded.tier === 'premium' ? 'premium' : 'free';
-        // 6. Attacher à la requête
+        // Ajout des informations utilisateur à la requête
         req.user = {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            tier,
-            emailVerified: user.emailVerified
+            id: decoded.userId,
+            email: decoded.email,
+            tier: decoded.tier || 'free'
         };
-        req.token = token;
-        log.debug(`Auth OK pour: ${user.email} (${tier})`);
+        log.info(`Utilisateur authentifié: ${decoded.email}`);
         next();
     }
     catch (error) {
-        log.error('Erreur middleware auth:', error);
+        log.error('Erreur authentification:', error);
+        if (error.name === 'TokenExpiredError') {
+            res.status(401).json({
+                success: false,
+                message: 'Token expiré',
+                code: 'TOKEN_EXPIRED'
+            });
+            return;
+        }
+        if (error.name === 'JsonWebTokenError') {
+            res.status(401).json({
+                success: false,
+                message: 'Token invalide',
+                code: 'INVALID_TOKEN'
+            });
+            return;
+        }
         res.status(500).json({
             success: false,
-            message: 'Erreur authentification',
+            message: 'Erreur serveur lors de l\'authentification',
             code: 'AUTH_ERROR'
         });
     }
 };
 exports.authenticate = authenticate;
-/**
- * Middleware optionnel - attache l'utilisateur si token présent
- */
-const optionalAuth = async (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-        next();
+// Middleware pour vérifier si l'utilisateur est premium
+const requirePremium = async (req, res, next) => {
+    const authReq = req;
+    if (!authReq.user) {
+        res.status(401).json({
+            success: false,
+            message: 'Authentification requise',
+            code: 'NOT_AUTHENTICATED'
+        });
         return;
     }
-    // Utiliser authenticate mais continuer même si échec
-    (0, exports.authenticate)(req, res, () => {
-        next();
-    });
+    if (authReq.user.tier !== 'premium') {
+        res.status(403).json({
+            success: false,
+            message: 'Abonnement Premium requis',
+            code: 'PREMIUM_REQUIRED'
+        });
+        return;
+    }
+    next();
+};
+exports.requirePremium = requirePremium;
+// Middleware optionnel - authentifie si token présent mais ne bloque pas
+const optionalAuth = async (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.split(' ')[1];
+        if (token) {
+            const decoded = await (0, jwt_1.verifyToken)(token);
+            if (decoded) {
+                req.user = {
+                    id: decoded.userId,
+                    email: decoded.email,
+                    tier: decoded.tier || 'free'
+                };
+            }
+        }
+    }
+    catch (error) {
+        // Ignorer les erreurs - authentification optionnelle
+        log.debug('Auth optionnelle échouée, continuer sans auth');
+    }
+    next();
 };
 exports.optionalAuth = optionalAuth;
-/**
- * Middleware pour routes admin uniquement
- */
-const adminAuth = async (req, res, next) => {
-    await (0, exports.authenticate)(req, res, () => {
-        if (req.user?.email !== process.env.ADMIN_EMAIL) {
-            res.status(403).json({
-                success: false,
-                message: 'Accès administrateur requis',
-                code: 'ADMIN_REQUIRED'
-            });
-            return;
-        }
-        next();
-    });
-};
-exports.adminAuth = adminAuth;
+exports.default = exports.authenticate;
