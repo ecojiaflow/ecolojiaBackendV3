@@ -1,311 +1,237 @@
-// PATH: backend/src/routes/payment.routes.ts
+// PATH: frontend/ecolojiaFrontV3/src/services/paymentService.ts
+import axios from 'axios';
 
-import express from 'express';
-import { lemonSqueezyService } from '../services/LemonSqueezyService';
-import User from '../models/User';
-import { authenticateToken } from '../middleware/auth';
+const API_BASE_URL = 'https://ecolojia-backend-working.onrender.com/api';
 
-const router = express.Router();
+interface CheckoutResponse {
+  checkoutUrl: string;
+}
 
-/**
- * POST /api/payment/create-checkout
- * Crée une session de checkout Lemon Squeezy
- */
-router.post('/create-checkout', authenticateToken, async (req: any, res) => {
-  try {
-    const userId = req.userId;
-    const user = await User.findById(userId);
+interface PortalResponse {
+  portalUrl: string;
+}
 
-    if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Utilisateur non trouvé' 
-      });
-    }
+interface SubscriptionStatus {
+  isActive: boolean;
+  status: string;
+  currentPeriodEnd?: Date;
+  cancelledAt?: Date;
+}
 
-    if (user.tier === 'premium') {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Vous êtes déjà Premium' 
-      });
-    }
+class PaymentService {
+  private getAuthToken(): string | null {
+    return localStorage.getItem('token');
+  }
 
-    // Vérifier que le service est configuré
-    if (!lemonSqueezyService.isConfigured()) {
-      return res.status(503).json({
-        success: false,
-        error: 'Service de paiement temporairement indisponible'
-      });
-    }
+  private getHeaders(): any {
+    const token = this.getAuthToken();
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': token ? `Bearer ${token}` : ''
+    };
+  }
 
-    // Créer l'URL de checkout
-    const checkoutUrl = await lemonSqueezyService.createCheckoutUrl({
-      email: user.email,
-      name: user.name,
-      customData: {
-        userId: user._id.toString()
+  /**
+   * Créer une session de checkout Lemon Squeezy
+   */
+  async createCheckout(): Promise<string> {
+    try {
+      const response = await axios.post<CheckoutResponse>(
+        `${API_BASE_URL}/payment/create-checkout`,
+        {},
+        { headers: this.getHeaders() }
+      );
+
+      if (!response.data.checkoutUrl) {
+        throw new Error('URL de paiement non reçue');
       }
-    });
 
-    res.json({
-      success: true,
-      checkoutUrl
-    });
-
-  } catch (error: any) {
-    console.error('Erreur création checkout:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Erreur lors de la création de la session de paiement' 
-    });
-  }
-});
-
-/**
- * POST /api/payment/webhook
- * Webhook Lemon Squeezy pour gérer les événements
- */
-router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  try {
-    const signature = req.headers['x-signature'] as string;
-    const rawBody = req.body.toString();
-
-    // Vérifier la signature
-    if (!lemonSqueezyService.verifyWebhookSignature(rawBody, signature)) {
-      return res.status(401).json({ error: 'Signature invalide' });
+      return response.data.checkoutUrl;
+    } catch (error) {
+      console.error('Create checkout error:', error);
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 401) {
+          throw new Error('Veuillez vous connecter pour continuer');
+        }
+        if (error.response?.status === 404) {
+          throw new Error('Service de paiement non disponible');
+        }
+        throw new Error(error.response?.data?.message || 'Erreur lors de la création du paiement');
+      }
+      throw new Error('Erreur de connexion');
     }
+  }
 
-    const payload = JSON.parse(rawBody);
-    const eventName = payload.meta.event_name;
+  /**
+   * Obtenir l'URL du portail client Lemon Squeezy
+   */
+  async getCustomerPortal(): Promise<string> {
+    try {
+      // Vérifier d'abord si l'utilisateur a un abonnement actif
+      const status = await this.checkSubscriptionStatus();
+      if (!status.isActive) {
+        throw new Error('Aucun abonnement actif. Veuillez d\'abord souscrire à un abonnement.');
+      }
 
-    console.log(`📨 Webhook Lemon Squeezy reçu: ${eventName}`);
+      const response = await axios.get<PortalResponse>(
+        `${API_BASE_URL}/payment/customer-portal`,
+        { headers: this.getHeaders() }
+      );
 
-    // Gérer les différents événements
-    switch (eventName) {
-      case 'subscription_created':
-        await handleSubscriptionCreated(payload);
-        break;
+      if (!response.data.portalUrl) {
+        throw new Error('URL du portail non reçue');
+      }
 
-      case 'subscription_updated':
-        await handleSubscriptionUpdated(payload);
-        break;
-
-      case 'subscription_cancelled':
-        await handleSubscriptionCancelled(payload);
-        break;
-
-      case 'subscription_resumed':
-        await handleSubscriptionResumed(payload);
-        break;
-
-      case 'subscription_expired':
-        await handleSubscriptionExpired(payload);
-        break;
-
-      case 'subscription_payment_success':
-        await handlePaymentSuccess(payload);
-        break;
-
-      case 'subscription_payment_failed':
-        await handlePaymentFailed(payload);
-        break;
-
-      default:
-        console.log(`Événement non géré: ${eventName}`);
+      return response.data.portalUrl;
+    } catch (error) {
+      console.error('Get portal error:', error);
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 404) {
+          // Si l'endpoint n'existe pas, essayer de créer un checkout à la place
+          console.warn('Portal endpoint not found, redirecting to checkout...');
+          throw new Error('Redirection vers la page d\'abonnement...');
+        }
+        if (error.response?.status === 401) {
+          throw new Error('Veuillez vous connecter pour accéder au portail');
+        }
+        throw new Error(error.response?.data?.message || 'Erreur lors de l\'accès au portail');
+      }
+      throw error;
     }
-
-    res.json({ success: true });
-
-  } catch (error: any) {
-    console.error('Erreur webhook:', error);
-    res.status(400).json({ error: 'Erreur traitement webhook' });
   }
-});
 
-/**
- * GET /api/payment/portal
- * Récupère l'URL du portail client
- */
-router.get('/portal', authenticateToken, async (req: any, res) => {
-  try {
-    const userId = req.userId;
-    const user = await User.findById(userId);
+  /**
+   * Vérifier le statut de l'abonnement
+   */
+  async checkSubscriptionStatus(): Promise<SubscriptionStatus> {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/user/subscription-status`,
+        { headers: this.getHeaders() }
+      );
 
-    if (!user || !user.lemonSqueezyCustomerId) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Client non trouvé' 
-      });
+      return {
+        isActive: response.data.isActive || false,
+        status: response.data.status || 'inactive',
+        currentPeriodEnd: response.data.currentPeriodEnd ? new Date(response.data.currentPeriodEnd) : undefined,
+        cancelledAt: response.data.cancelledAt ? new Date(response.data.cancelledAt) : undefined
+      };
+    } catch (error) {
+      console.error('Check subscription error:', error);
+      // En cas d'erreur, considérer comme non Premium
+      return {
+        isActive: false,
+        status: 'inactive'
+      };
     }
+  }
 
-    // Vérifier que le service est configuré
-    if (!lemonSqueezyService.isConfigured()) {
-      return res.status(503).json({
-        success: false,
-        error: 'Service de paiement temporairement indisponible'
-      });
+  /**
+   * Gérer le retour après paiement
+   */
+  async handlePaymentReturn(sessionId?: string): Promise<boolean> {
+    try {
+      if (!sessionId) {
+        // Vérifier simplement le statut
+        const status = await this.checkSubscriptionStatus();
+        return status.isActive;
+      }
+
+      // Vérifier la session de paiement
+      const response = await axios.post(
+        `${API_BASE_URL}/payment/verify-session`,
+        { sessionId },
+        { headers: this.getHeaders() }
+      );
+
+      return response.data.success === true;
+    } catch (error) {
+      console.error('Handle payment return error:', error);
+      return false;
     }
-
-    const portalUrl = await lemonSqueezyService.getCustomerPortalUrl(
-      user.lemonSqueezyCustomerId
-    );
-
-    res.json({
-      success: true,
-      portalUrl
-    });
-
-  } catch (error: any) {
-    console.error('Erreur création portail:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Erreur lors de la création du portail' 
-    });
   }
-});
 
-/**
- * Handlers pour les événements webhook
- */
-async function handleSubscriptionCreated(payload: any) {
-  try {
-    const userId = payload.meta.custom_data?.user_id;
-    if (!userId) return;
-
-    const user = await User.findById(userId);
-    if (!user) return;
-
-    const subscription = payload.data.attributes;
-
-    // Mettre à jour l'utilisateur
-    user.tier = 'premium';
-    user.lemonSqueezyCustomerId = subscription.customer_id.toString();
-    user.lemonSqueezySubscriptionId = payload.data.id;
-    user.subscriptionStatus = 'active';
-    user.subscriptionStartDate = new Date(subscription.created_at);
-    user.subscriptionCurrentPeriodEnd = subscription.renews_at 
-      ? new Date(subscription.renews_at) 
-      : undefined;
-
-    // Quotas Premium illimités
-    user.quotas = {
-      analyses: -1,
-      aiQuestions: -1,
-      exports: 10,
-      apiCalls: 1000
-    };
-
-    await user.save();
-    console.log(`✅ Utilisateur ${userId} passé en Premium via Lemon Squeezy`);
-
-  } catch (error) {
-    console.error('Erreur handleSubscriptionCreated:', error);
-  }
-}
-
-async function handleSubscriptionUpdated(payload: any) {
-  try {
-    const subscriptionId = payload.data.id;
-    const user = await User.findOne({ lemonSqueezySubscriptionId: subscriptionId });
-    
-    if (!user) return;
-
-    const subscription = payload.data.attributes;
-    user.subscriptionStatus = subscription.status;
-    
-    if (subscription.renews_at) {
-      user.subscriptionCurrentPeriodEnd = new Date(subscription.renews_at);
+  /**
+   * Annuler l'abonnement
+   */
+  async cancelSubscription(): Promise<void> {
+    try {
+      await axios.post(
+        `${API_BASE_URL}/payment/cancel-subscription`,
+        {},
+        { headers: this.getHeaders() }
+      );
+    } catch (error) {
+      console.error('Cancel subscription error:', error);
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 404) {
+          throw new Error('Fonction non disponible pour le moment');
+        }
+        throw new Error(error.response?.data?.message || 'Erreur lors de l\'annulation');
+      }
+      throw new Error('Erreur de connexion');
     }
+  }
 
-    await user.save();
-    console.log(`✅ Abonnement mis à jour pour l'utilisateur ${user._id}`);
+  /**
+   * Réactiver l'abonnement
+   */
+  async resumeSubscription(): Promise<void> {
+    try {
+      await axios.post(
+        `${API_BASE_URL}/payment/resume-subscription`,
+        {},
+        { headers: this.getHeaders() }
+      );
+    } catch (error) {
+      console.error('Resume subscription error:', error);
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 404) {
+          throw new Error('Fonction non disponible pour le moment');
+        }
+        throw new Error(error.response?.data?.message || 'Erreur lors de la réactivation');
+      }
+      throw new Error('Erreur de connexion');
+    }
+  }
 
-  } catch (error) {
-    console.error('Erreur handleSubscriptionUpdated:', error);
+  /**
+   * Obtenir l'historique des paiements
+   */
+  async getPaymentHistory(): Promise<any[]> {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/payment/history`,
+        { headers: this.getHeaders() }
+      );
+
+      return response.data.payments || [];
+    } catch (error) {
+      console.error('Get payment history error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Méthode de fallback pour gérer l'abonnement
+   * Redirige vers le checkout si pas d'abonnement actif
+   */
+  async manageSubscription(): Promise<string> {
+    try {
+      // Essayer d'abord d'accéder au portail
+      return await this.getCustomerPortal();
+    } catch (error: any) {
+      console.warn('Portal not accessible, trying checkout...', error.message);
+      
+      // Si le portail n'est pas accessible, créer un checkout
+      try {
+        return await this.createCheckout();
+      } catch (checkoutError) {
+        console.error('Both portal and checkout failed:', checkoutError);
+        throw new Error('Service de paiement temporairement indisponible');
+      }
+    }
   }
 }
 
-async function handleSubscriptionCancelled(payload: any) {
-  try {
-    const subscriptionId = payload.data.id;
-    const user = await User.findOne({ lemonSqueezySubscriptionId: subscriptionId });
-    
-    if (!user) return;
-
-    user.subscriptionStatus = 'cancelled';
-    user.subscriptionCancelledAt = new Date();
-    
-    // L'utilisateur reste Premium jusqu'à la fin de la période
-    console.log(`⚠️ Abonnement annulé pour l'utilisateur ${user._id} - Premium jusqu'au ${user.subscriptionCurrentPeriodEnd}`);
-    
-    await user.save();
-
-  } catch (error) {
-    console.error('Erreur handleSubscriptionCancelled:', error);
-  }
-}
-
-async function handleSubscriptionExpired(payload: any) {
-  try {
-    const subscriptionId = payload.data.id;
-    const user = await User.findOne({ lemonSqueezySubscriptionId: subscriptionId });
-    
-    if (!user) return;
-
-    // Retour au tier gratuit
-    user.tier = 'free';
-    user.subscriptionStatus = 'expired';
-    
-    // Réinitialiser quotas gratuits
-    user.quotas = {
-      analyses: 30,
-      aiQuestions: 0,
-      exports: 0,
-      apiCalls: 0
-    };
-
-    await user.save();
-    console.log(`❌ Abonnement expiré pour l'utilisateur ${user._id} - Retour au plan gratuit`);
-
-  } catch (error) {
-    console.error('Erreur handleSubscriptionExpired:', error);
-  }
-}
-
-async function handleSubscriptionResumed(payload: any) {
-  try {
-    const subscriptionId = payload.data.id;
-    const user = await User.findOne({ lemonSqueezySubscriptionId: subscriptionId });
-    
-    if (!user) return;
-
-    user.tier = 'premium';
-    user.subscriptionStatus = 'active';
-    user.subscriptionCancelledAt = undefined;
-    
-    // Restaurer quotas Premium
-    user.quotas = {
-      analyses: -1,
-      aiQuestions: -1,
-      exports: 10,
-      apiCalls: 1000
-    };
-
-    await user.save();
-    console.log(`✅ Abonnement réactivé pour l'utilisateur ${user._id}`);
-
-  } catch (error) {
-    console.error('Erreur handleSubscriptionResumed:', error);
-  }
-}
-
-async function handlePaymentSuccess(payload: any) {
-  console.log(`✅ Paiement réussi pour l'abonnement ${payload.data.id}`);
-}
-
-async function handlePaymentFailed(payload: any) {
-  console.log(`❌ Échec du paiement pour l'abonnement ${payload.data.id}`);
-  // TODO: Envoyer un email d'alerte
-}
-
-export default router;
+export const paymentService = new PaymentService();

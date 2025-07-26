@@ -1,9 +1,14 @@
 // ==============================
 // 📁 backend/src/routes/user.routes.ts
-// SYSTÈME DE QUOTA ECOLOJIA
+// SYSTÈME DE QUOTA ET GESTION UTILISATEUR ECOLOJIA
 // ==============================
 
 import express, { Request, Response, NextFunction } from 'express';
+import { authMiddleware } from '../middleware/authMiddleware';
+import { mongoDBService } from '../services/MongoDBService';
+import { AnalysisCache } from '../models/AnalysisCache';
+import { UserAnalytics } from '../models/UserAnalytics';
+import { User } from '../models/User';
 
 const router = express.Router();
 
@@ -72,13 +77,39 @@ function getResetTime(): string {
 
 // ==============================
 // ROUTE GET /api/user/quota
+// Route existante améliorée
 // ==============================
 
-router.get('/quota', (req: Request, res: Response) => {
+router.get('/quota', async (req: Request, res: Response) => {
   try {
     console.log('📊 Demande quota utilisateur');
     
     const userId = getUserId(req);
+    
+    // Si l'utilisateur est authentifié, vérifier aussi dans MongoDB
+    if (req.headers.authorization) {
+      try {
+        const quotaCheck = await mongoDBService.checkUserQuota(userId, 'analyses');
+        return res.json({
+          success: true,
+          allowed: quotaCheck.allowed,
+          remaining: quotaCheck.remaining,
+          resetDate: quotaCheck.resetDate,
+          quota: {
+            used_analyses: quotaCheck.used || 0,
+            remaining_analyses: quotaCheck.remaining,
+            daily_limit: quotaCheck.limit || DAILY_LIMITS.free.analyses,
+            reset_time: quotaCheck.resetDate,
+            current_date: getTodayString(),
+            plan: quotaCheck.plan || 'free'
+          }
+        });
+      } catch (mongoError) {
+        console.log('⚠️ Fallback to in-memory quota');
+      }
+    }
+    
+    // Fallback to in-memory quota system
     const userQuota = initUserQuota(userId);
     const limits = DAILY_LIMITS[userQuota.plan] || DAILY_LIMITS.free;
     
@@ -115,6 +146,166 @@ router.get('/quota', (req: Request, res: Response) => {
         plan: 'free'
       }
     });
+  }
+});
+
+// ==============================
+// NOUVELLES ROUTES - HISTORIQUE
+// ==============================
+
+// Route pour sauvegarder une analyse dans l'historique
+router.post('/history', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { productId, analysisData, category } = req.body;
+
+    // Enregistrer dans analytics
+    await UserAnalytics.findOneAndUpdate(
+      { 
+        userId, 
+        date: new Date().setHours(0, 0, 0, 0) 
+      },
+      {
+        $push: {
+          events: {
+            type: 'scan',
+            timestamp: new Date(),
+            productId,
+            category,
+            healthScore: analysisData.healthScore,
+            metadata: analysisData
+          }
+        },
+        $addToSet: {
+          'daily.uniqueProducts': productId,
+          'daily.categoriesScanned': category
+        },
+        $inc: {
+          'daily.scans': 1
+        }
+      },
+      { upsert: true }
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Save history error:', error);
+    res.status(500).json({ error: 'Failed to save to history' });
+  }
+});
+
+// Route pour récupérer l'historique
+router.get('/history', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const limit = parseInt(req.query.limit as string) || 20;
+    
+    // Récupérer les dernières analyses de l'utilisateur
+    const analytics = await UserAnalytics.find({ userId })
+      .sort({ date: -1 })
+      .limit(30); // 30 derniers jours
+
+    // Extraire tous les événements de type 'scan'
+    const scanEvents: any[] = [];
+    for (const day of analytics) {
+      for (const event of day.events) {
+        if (event.type === 'scan' && event.metadata) {
+          scanEvents.push({
+            productId: event.productId,
+            productName: event.metadata.productName || 'Produit',
+            brand: event.metadata.brand,
+            category: event.category,
+            analysis: {
+              healthScore: event.healthScore,
+              category: event.metadata.category,
+              recommendations: event.metadata.recommendations || []
+            },
+            timestamp: event.timestamp
+          });
+        }
+      }
+    }
+
+    // Trier par date et limiter
+    const sortedEvents = scanEvents
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+      .slice(0, limit);
+
+    res.json(sortedEvents);
+  } catch (error) {
+    console.error('Get history error:', error);
+    res.status(500).json({ error: 'Failed to get history' });
+  }
+});
+
+// ==============================
+// NOUVELLES ROUTES - ABONNEMENT
+// ==============================
+
+// Route pour obtenir le statut de l'abonnement
+router.get('/subscription-status', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      isActive: user.tier === 'premium' && user.subscriptionStatus === 'active',
+      status: user.subscriptionStatus || 'inactive',
+      currentPeriodEnd: user.subscriptionCurrentPeriodEnd,
+      cancelledAt: user.subscriptionCancelledAt
+    });
+  } catch (error) {
+    console.error('Get subscription status error:', error);
+    res.status(500).json({ error: 'Failed to get subscription status' });
+  }
+});
+
+// ==============================
+// NOUVELLES ROUTES - ANALYTICS
+// ==============================
+
+// Route pour obtenir les analytics utilisateur
+router.get('/analytics', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const days = parseInt(req.query.days as string) || 30;
+    
+    const analytics = await mongoDBService.getUserAnalytics(userId, days);
+    
+    res.json(analytics);
+  } catch (error) {
+    console.error('Get analytics error:', error);
+    res.status(500).json({ error: 'Failed to get analytics' });
+  }
+});
+
+// ==============================
+// NOUVELLES ROUTES - PRÉFÉRENCES
+// ==============================
+
+// Route pour mettre à jour les préférences utilisateur
+router.put('/preferences', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { preferences } = req.body;
+    
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { preferences },
+      { new: true }
+    );
+    
+    res.json({
+      success: true,
+      preferences: user?.preferences
+    });
+  } catch (error) {
+    console.error('Update preferences error:', error);
+    res.status(500).json({ error: 'Failed to update preferences' });
   }
 });
 
