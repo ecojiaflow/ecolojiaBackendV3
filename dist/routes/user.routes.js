@@ -33,7 +33,11 @@ const DAILY_LIMITS = {
 // UTILITAIRES QUOTA
 // ==============================
 function getUserId(req) {
-    // Utilisateur authentifié ou anonyme
+    // Si c'est une requête authentifiée avec cacheAuthMiddleware
+    if ('cacheUser' in req && req.cacheUser) {
+        return req.cacheUser.id;
+    }
+    // Sinon, utilisateur anonyme
     return req.headers.authorization?.replace('Bearer ', '') ||
         req.headers['x-anonymous-id'] ||
         'anonymous_' + Date.now();
@@ -133,7 +137,10 @@ router.get('/quota', async (req, res) => {
 // ==============================
 router.get('/me', cacheAuthMiddleware_1.cacheAuthMiddleware, async (req, res) => {
     try {
-        const userId = req.userId;
+        if (!req.cacheUser) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+        const userId = req.cacheUser.id;
         const user = await User_1.User.findById(userId).select('-password');
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
@@ -143,7 +150,7 @@ router.get('/me', cacheAuthMiddleware_1.cacheAuthMiddleware, async (req, res) =>
                 id: user._id,
                 email: user.email,
                 name: user.name,
-                tier: user.tier || 'free',
+                tier: user.tier || req.cacheUser.tier || 'free',
                 createdAt: user.createdAt,
                 preferences: user.preferences || {}
             }
@@ -160,7 +167,10 @@ router.get('/me', cacheAuthMiddleware_1.cacheAuthMiddleware, async (req, res) =>
 // Route pour sauvegarder une analyse dans l'historique
 router.post('/history', cacheAuthMiddleware_1.cacheAuthMiddleware, async (req, res) => {
     try {
-        const userId = req.userId;
+        if (!req.cacheUser) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+        const userId = req.cacheUser.id;
         const { productId, analysisData, category } = req.body;
         // Enregistrer dans analytics
         await UserAnalytics_1.UserAnalytics.findOneAndUpdate({
@@ -195,7 +205,10 @@ router.post('/history', cacheAuthMiddleware_1.cacheAuthMiddleware, async (req, r
 // Route pour récupérer l'historique
 router.get('/history', cacheAuthMiddleware_1.cacheAuthMiddleware, async (req, res) => {
     try {
-        const userId = req.userId;
+        if (!req.cacheUser) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+        const userId = req.cacheUser.id;
         const limit = parseInt(req.query.limit) || 20;
         // Récupérer les dernières analyses de l'utilisateur
         const analytics = await UserAnalytics_1.UserAnalytics.find({ userId })
@@ -238,7 +251,10 @@ router.get('/history', cacheAuthMiddleware_1.cacheAuthMiddleware, async (req, re
 // Route pour obtenir le statut de l'abonnement
 router.get('/subscription-status', cacheAuthMiddleware_1.cacheAuthMiddleware, async (req, res) => {
     try {
-        const userId = req.userId;
+        if (!req.cacheUser) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+        const userId = req.cacheUser.id;
         const user = await User_1.User.findById(userId);
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
@@ -261,7 +277,10 @@ router.get('/subscription-status', cacheAuthMiddleware_1.cacheAuthMiddleware, as
 // Route pour obtenir les analytics utilisateur
 router.get('/analytics', cacheAuthMiddleware_1.cacheAuthMiddleware, async (req, res) => {
     try {
-        const userId = req.userId;
+        if (!req.cacheUser) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+        const userId = req.cacheUser.id;
         const days = parseInt(req.query.days) || 30;
         const analytics = await MongoDBService_1.mongoDBService.getUserAnalytics(userId, days);
         res.json(analytics);
@@ -277,7 +296,10 @@ router.get('/analytics', cacheAuthMiddleware_1.cacheAuthMiddleware, async (req, 
 // Route pour mettre à jour les préférences utilisateur
 router.put('/preferences', cacheAuthMiddleware_1.cacheAuthMiddleware, async (req, res) => {
     try {
-        const userId = req.userId;
+        if (!req.cacheUser) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+        const userId = req.cacheUser.id;
         const { preferences } = req.body;
         const user = await User_1.User.findByIdAndUpdate(userId, { $set: { preferences } }, { new: true });
         res.json({
