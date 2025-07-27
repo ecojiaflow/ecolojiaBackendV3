@@ -110,7 +110,7 @@ ChatHistorySchema.methods.addMessage = async function (message) {
     }
     await this.save();
 };
-// Méthode pour calculer le total de tokens
+// Méthode pour calculer le total de tokens - FIX: Ajout des types explicites
 ChatHistorySchema.methods.calculateTotalTokens = function () {
     return this.messages.reduce((total, msg) => total + (msg.tokensUsed || 0), 0);
 };

@@ -33,7 +33,7 @@ class MongoDBService {
             }, { new: true });
             if (user) {
                 // Enregistrer l'événement dans UserAnalytics
-                await this.recordAnalyticsEvent(user._id.toString(), 'premium_upgrade', {
+                await this.recordAnalyticsEvent((user.id || user._id?.toString() || ""), 'premium_upgrade', {
                     subscriptionId: lemonSqueezyData.subscriptionId,
                     plan: 'premium'
                 });

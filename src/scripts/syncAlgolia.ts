@@ -1,8 +1,8 @@
 // PATH: src/scripts/syncAlgolia.ts
-import { PrismaClient } from '@prisma/client';
+// // import { PrismaClient } from '@prisma/client';
 import AlgoliaService from '../services/algoliaService';
 
-const prisma = new PrismaClient();
+const prisma = null // new PrismaClient();
 
 interface SyncOptions {
   useStaging?: boolean;

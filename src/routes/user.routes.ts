@@ -1,7 +1,7 @@
-// PATH: backend/src/routes/user.routes.ts
+﻿// PATH: backend/src/routes/user.routes.ts
 // ==============================
-// 📁 backend/src/routes/user.routes.ts
-// SYSTÈME DE QUOTA ET GESTION UTILISATEUR ECOLOJIA
+// ðŸ“ backend/src/routes/user.routes.ts
+// SYSTÃˆME DE QUOTA ET GESTION UTILISATEUR ECOLOJIA
 // ==============================
 
 import express, { Request, Response, NextFunction } from 'express';
@@ -14,7 +14,7 @@ import { User } from '../models/User';
 const router = express.Router();
 
 // ==============================
-// SYSTÈME DE QUOTA EN MÉMOIRE
+// SYSTÃˆME DE QUOTA EN MÃ‰MOIRE
 // ==============================
 
 interface UserQuota {
@@ -36,7 +36,7 @@ interface QuotaCheck {
 // Structure : { userId: { analyses: 5, lastReset: '2025-07-13', chat: 20 } }
 const userQuotas = new Map<string, UserQuota>();
 
-// Limites par défaut
+// Limites par dÃ©faut
 const DAILY_LIMITS = {
   free: {
     analyses: 10,
@@ -53,7 +53,7 @@ const DAILY_LIMITS = {
 // ==============================
 
 function getUserId(req: any): string {
-  // Si c'est une requête authentifiée avec cacheAuthMiddleware
+  // Si c'est une requÃªte authentifiÃ©e avec cacheAuthMiddleware
   if (req.cacheUser) {
     return req.cacheUser.id;
   }
@@ -92,16 +92,16 @@ function getResetTime(): string {
 
 // ==============================
 // ROUTE GET /api/user/quota
-// Route existante améliorée
+// Route existante amÃ©liorÃ©e
 // ==============================
 
 router.get('/quota', async (req: Request, res: Response) => {
   try {
-    console.log('📊 Demande quota utilisateur');
+    console.log('ðŸ“Š Demande quota utilisateur');
     
     const userId = getUserId(req);
     
-    // Si l'utilisateur est authentifié, vérifier aussi dans MongoDB
+    // Si l'utilisateur est authentifiÃ©, vÃ©rifier aussi dans MongoDB
     if (req.headers.authorization) {
       try {
         const quotaCheck = await mongoDBService.checkUserQuota(userId, 'analyses') as QuotaCheck;
@@ -120,7 +120,7 @@ router.get('/quota', async (req: Request, res: Response) => {
           }
         });
       } catch (mongoError) {
-        console.log('⚠️ Fallback to in-memory quota');
+        console.log('âš ï¸ Fallback to in-memory quota');
       }
     }
     
@@ -142,11 +142,11 @@ router.get('/quota', async (req: Request, res: Response) => {
       }
     };
     
-    console.log('✅ Quota envoyé:', response);
+    console.log('âœ… Quota envoyÃ©:', response);
     res.json(response);
     
   } catch (error) {
-    console.error('❌ Erreur quota:', error);
+    console.error('âŒ Erreur quota:', error); return res.status(500).json({ error: "Erreur serveur" });
     res.status(500).json({
       success: false,
       error: 'Erreur serveur quota',
@@ -193,7 +193,7 @@ router.get('/me', cacheAuthMiddleware as any, async (req: any, res: Response) =>
       }
     });
   } catch (error) {
-    console.error('Get user error:', error);
+    console.error('Get user error:', error); return res.status(500).json({ error: "Erreur serveur" });
     res.status(500).json({ error: 'Failed to get user info' });
   }
 });
@@ -242,12 +242,12 @@ router.post('/history', cacheAuthMiddleware as any, async (req: any, res: Respon
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Save history error:', error);
+    console.error('Save history error:', error); return res.status(500).json({ error: "Erreur serveur" });
     res.status(500).json({ error: 'Failed to save to history' });
   }
 });
 
-// Route pour récupérer l'historique
+// Route pour rÃ©cupÃ©rer l'historique
 router.get('/history', cacheAuthMiddleware as any, async (req: any, res: Response) => {
   try {
     if (!req.cacheUser) {
@@ -257,12 +257,12 @@ router.get('/history', cacheAuthMiddleware as any, async (req: any, res: Respons
     const userId = req.cacheUser.id;
     const limit = parseInt(req.query.limit as string) || 20;
     
-    // Récupérer les dernières analyses de l'utilisateur
+    // RÃ©cupÃ©rer les derniÃ¨res analyses de l'utilisateur
     const analytics = await UserAnalytics.find({ userId })
       .sort({ date: -1 })
       .limit(30); // 30 derniers jours
 
-    // Extraire tous les événements de type 'scan'
+    // Extraire tous les Ã©vÃ©nements de type 'scan'
     const scanEvents: any[] = [];
     for (const day of analytics) {
       for (const event of day.events) {
@@ -290,7 +290,7 @@ router.get('/history', cacheAuthMiddleware as any, async (req: any, res: Respons
 
     res.json(sortedEvents);
   } catch (error) {
-    console.error('Get history error:', error);
+    console.error('Get history error:', error); return res.status(500).json({ error: "Erreur serveur" });
     res.status(500).json({ error: 'Failed to get history' });
   }
 });
@@ -320,7 +320,7 @@ router.get('/subscription-status', cacheAuthMiddleware as any, async (req: any, 
       cancelledAt: user.subscriptionCancelledAt
     });
   } catch (error) {
-    console.error('Get subscription status error:', error);
+    console.error('Get subscription status error:', error); return res.status(500).json({ error: "Erreur serveur" });
     res.status(500).json({ error: 'Failed to get subscription status' });
   }
 });
@@ -343,16 +343,16 @@ router.get('/analytics', cacheAuthMiddleware as any, async (req: any, res: Respo
     
     res.json(analytics);
   } catch (error) {
-    console.error('Get analytics error:', error);
+    console.error('Get analytics error:', error); return res.status(500).json({ error: "Erreur serveur" });
     res.status(500).json({ error: 'Failed to get analytics' });
   }
 });
 
 // ==============================
-// NOUVELLES ROUTES - PRÉFÉRENCES
+// NOUVELLES ROUTES - PRÃ‰FÃ‰RENCES
 // ==============================
 
-// Route pour mettre à jour les préférences utilisateur
+// Route pour mettre Ã  jour les prÃ©fÃ©rences utilisateur
 router.put('/preferences', cacheAuthMiddleware as any, async (req: any, res: Response) => {
   try {
     if (!req.cacheUser) {
@@ -373,13 +373,13 @@ router.put('/preferences', cacheAuthMiddleware as any, async (req: any, res: Res
       preferences: (user as any)?.preferences || {}
     });
   } catch (error) {
-    console.error('Update preferences error:', error);
+    console.error('Update preferences error:', error); return res.status(500).json({ error: "Erreur serveur" });
     res.status(500).json({ error: 'Failed to update preferences' });
   }
 });
 
 // ==============================
-// MIDDLEWARE VÉRIFICATION QUOTA
+// MIDDLEWARE VÃ‰RIFICATION QUOTA
 // ==============================
 
 export function checkAnalysisQuota(req: Request, res: Response, next: NextFunction) {
@@ -401,16 +401,16 @@ export function checkAnalysisQuota(req: Request, res: Response, next: NextFuncti
       });
     }
     
-    // Incrémenter le compteur
+    // IncrÃ©menter le compteur
     userQuota.analyses++;
     userQuotas.set(userId, userQuota);
     
-    console.log(`📊 Quota analyse utilisé: ${userQuota.analyses}/${limits.analyses} (user: ${userId.substring(0, 20)}...)`);
+    console.log(`ðŸ“Š Quota analyse utilisÃ©: ${userQuota.analyses}/${limits.analyses} (user: ${userId.substring(0, 20)}...)`);
     next();
     
   } catch (error) {
-    console.error('❌ Erreur middleware quota analyse:', error);
-    next(); // En cas d'erreur, on continue (mode dégradé)
+    console.error('âŒ Erreur middleware quota analyse:', error); return res.status(500).json({ error: "Erreur serveur" });
+    next(); // En cas d'erreur, on continue (mode dÃ©gradÃ©)
   }
 }
 
@@ -432,16 +432,16 @@ export function checkChatQuota(req: Request, res: Response, next: NextFunction) 
       });
     }
     
-    // Incrémenter le compteur
+    // IncrÃ©menter le compteur
     userQuota.chat++;
     userQuotas.set(userId, userQuota);
     
-    console.log(`💬 Quota chat utilisé: ${userQuota.chat}/${limits.chat} (user: ${userId.substring(0, 20)}...)`);
+    console.log(`ðŸ’¬ Quota chat utilisÃ©: ${userQuota.chat}/${limits.chat} (user: ${userId.substring(0, 20)}...)`);
     next();
     
   } catch (error) {
-    console.error('❌ Erreur middleware chat quota:', error);
-    next(); // En cas d'erreur, on continue (mode dégradé)
+    console.error('âŒ Erreur middleware chat quota:', error); return res.status(500).json({ error: "Erreur serveur" });
+    next(); // En cas d'erreur, on continue (mode dÃ©gradÃ©)
   }
 }
 

@@ -116,9 +116,9 @@ ChatHistorySchema.methods.addMessage = async function(message: IChatMessage): Pr
   await this.save();
 };
 
-// Méthode pour calculer le total de tokens
+// Méthode pour calculer le total de tokens - FIX: Ajout des types explicites
 ChatHistorySchema.methods.calculateTotalTokens = function(): number {
-  return this.messages.reduce((total, msg) => total + (msg.tokensUsed || 0), 0);
+  return this.messages.reduce((total: number, msg: IChatMessage) => total + (msg.tokensUsed || 0), 0);
 };
 
 // Index pour recherche efficace

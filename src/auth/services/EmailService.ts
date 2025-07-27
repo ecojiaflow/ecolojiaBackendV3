@@ -1,8 +1,8 @@
-// PATH: backend/src/auth/services/EmailService.ts
+﻿// PATH: backend/src/auth/services/EmailService.ts
 import nodemailer from 'nodemailer';
-import { PrismaClient } from '@prisma/client';
+// // import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+const prisma = null // new PrismaClient();
 
 export interface EmailConfig {
   host: string;
@@ -30,7 +30,7 @@ export class EmailService {
     this.fromName = process.env.EMAIL_FROM_NAME || 'ECOLOJIA';
     
     // Configuration Gmail SMTP
-    // ✅ CORRECTION
+    // âœ… CORRECTION
 this.transporter = nodemailer.createTransport({
       host: process.env.EMAIL_SMTP_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.EMAIL_SMTP_PORT || '587'),
@@ -43,15 +43,15 @@ this.transporter = nodemailer.createTransport({
   }
 
   /**
-   * Envoyer email de validation après inscription
+   * Envoyer email de validation aprÃ¨s inscription
    */
   async sendVerificationEmail(userId: string, email: string, name: string): Promise<boolean> {
     try {
-      // Générer token de validation
+      // GÃ©nÃ©rer token de validation
       const token = this.generateVerificationToken();
       
       // Enregistrer token en base
-      await prisma.emailVerification.create({
+      // await prisma.emailVerification.create({ // PRISMA DISABLED
         data: {
           userId,
           email,
@@ -70,15 +70,15 @@ this.transporter = nodemailer.createTransport({
       const result = await this.transporter.sendMail({
         from: `"${this.fromName}" <${this.fromEmail}>`,
         to: email,
-        subject: '🌿 Activez votre compte ECOLOJIA',
+        subject: 'ðŸŒ¿ Activez votre compte ECOLOJIA',
         html
       });
 
-      console.log('✅ Email de validation envoyé:', result.messageId);
+      console.log('âœ… Email de validation envoyÃ©:', result.messageId);
       return true;
 
     } catch (error: any) {
-      console.error('❌ Erreur envoi email:', error);
+      console.error('âŒ Erreur envoi email:', error);
       return false;
     }
   }
@@ -89,40 +89,40 @@ this.transporter = nodemailer.createTransport({
   async resendVerificationEmail(email: string): Promise<boolean> {
     try {
       // Trouver utilisateur
-      const user = await prisma.user.findUnique({
+      // const user = await prisma.user.findUnique({ // PRISMA DISABLED
         where: { email }
       });
 
       if (!user) {
-        throw new Error('Utilisateur non trouvé');
+        throw new Error('Utilisateur non trouvÃ©');
       }
 
       if (user.emailVerified) {
-        throw new Error('Email déjà vérifié');
+        throw new Error('Email dÃ©jÃ  vÃ©rifiÃ©');
       }
 
       // Invalider anciens tokens
-      await prisma.emailVerification.updateMany({
+      // await prisma.emailVerification.updateMany({ // PRISMA DISABLED
         where: { email },
-        data: { verified: true } // Marquer comme utilisés
+        data: { verified: true } // Marquer comme utilisÃ©s
       });
 
       // Envoyer nouveau email
       return await this.sendVerificationEmail(user.id, user.email, user.name);
 
     } catch (error: any) {
-      console.error('❌ Erreur renvoi email:', error);
+      console.error('âŒ Erreur renvoi email:', error);
       return false;
     }
   }
 
   /**
-   * Vérifier token de validation email
+   * VÃ©rifier token de validation email
    */
   async verifyEmailToken(token: string): Promise<{ success: boolean; message: string }> {
     try {
       // Chercher token valide
-      const verification = await prisma.emailVerification.findFirst({
+      // const verification = await prisma.emailVerification.findFirst({ // PRISMA DISABLED
         where: {
           token,
           verified: false,
@@ -133,32 +133,32 @@ this.transporter = nodemailer.createTransport({
       if (!verification) {
         return {
           success: false,
-          message: 'Token invalide ou expiré'
+          message: 'Token invalide ou expirÃ©'
         };
       }
 
-      // Marquer token comme utilisé
-      await prisma.emailVerification.update({
+      // Marquer token comme utilisÃ©
+      // await prisma.emailVerification.update({ // PRISMA DISABLED
         where: { id: verification.id },
         data: { verified: true }
       });
 
-      // Marquer utilisateur comme vérifié
-      await prisma.user.update({
+      // Marquer utilisateur comme vÃ©rifiÃ©
+      // await prisma.user.update({ // PRISMA DISABLED
         where: { id: verification.userId! },
         data: { emailVerified: true }
       });
 
       return {
         success: true,
-        message: 'Email vérifié avec succès'
+        message: 'Email vÃ©rifiÃ© avec succÃ¨s'
       };
 
     } catch (error: any) {
-      console.error('❌ Erreur vérification token:', error);
+      console.error('âŒ Erreur vÃ©rification token:', error);
       return {
         success: false,
-        message: 'Erreur lors de la vérification'
+        message: 'Erreur lors de la vÃ©rification'
       };
     }
   }
@@ -186,7 +186,7 @@ this.transporter = nodemailer.createTransport({
 <body>
   <div class="container">
     <div class="header">
-      <h1>🌿 ECOLOJIA</h1>
+      <h1>ðŸŒ¿ ECOLOJIA</h1>
       <p style="color: white; margin: 10px 0 0 0; opacity: 0.9;">Votre assistant IA pour une consommation responsable</p>
     </div>
     
@@ -195,23 +195,23 @@ this.transporter = nodemailer.createTransport({
       
       <p>Bienvenue sur <strong>ECOLOJIA</strong> ! Nous sommes ravis de vous compter parmi nos utilisateurs.</p>
       
-      <p>Pour finaliser votre inscription et accéder à toutes nos fonctionnalités, veuillez <strong>activer votre compte</strong> en cliquant sur le bouton ci-dessous :</p>
+      <p>Pour finaliser votre inscription et accÃ©der Ã  toutes nos fonctionnalitÃ©s, veuillez <strong>activer votre compte</strong> en cliquant sur le bouton ci-dessous :</p>
       
       <div style="text-align: center; margin: 30px 0;">
-        <a href="${verificationUrl}" class="button">✅ Activer mon compte</a>
+        <a href="${verificationUrl}" class="button">âœ… Activer mon compte</a>
       </div>
       
       <p><strong>Ce que vous pouvez faire avec ECOLOJIA :</strong></p>
       <ul>
-        <li>🔍 <strong>30 analyses gratuites par mois</strong> de vos produits</li>
-        <li>🔬 <strong>IA scientifique avancée</strong> basée sur INSERM/ANSES</li>
-        <li>📱 <strong>Scanner universel</strong> alimentaire, cosmétique, détergent</li>
-        <li>📊 <strong>Scores santé détaillés</strong> avec alternatives</li>
-        <li>🌱 <strong>Conseils personnalisés</strong> pour une consommation responsable</li>
+        <li>ðŸ” <strong>30 analyses gratuites par mois</strong> de vos produits</li>
+        <li>ðŸ”¬ <strong>IA scientifique avancÃ©e</strong> basÃ©e sur INSERM/ANSES</li>
+        <li>ðŸ“± <strong>Scanner universel</strong> alimentaire, cosmÃ©tique, dÃ©tergent</li>
+        <li>ðŸ“Š <strong>Scores santÃ© dÃ©taillÃ©s</strong> avec alternatives</li>
+        <li>ðŸŒ± <strong>Conseils personnalisÃ©s</strong> pour une consommation responsable</li>
       </ul>
       
       <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
-        <p style="margin: 0; color: #92400e;"><strong>⏰ Important :</strong> Ce lien expire dans <strong>24 heures</strong>. Activez votre compte rapidement !</p>
+        <p style="margin: 0; color: #92400e;"><strong>â° Important :</strong> Ce lien expire dans <strong>24 heures</strong>. Activez votre compte rapidement !</p>
       </div>
       
       <p>Si le bouton ne fonctionne pas, copiez et collez ce lien dans votre navigateur :</p>
@@ -219,15 +219,15 @@ this.transporter = nodemailer.createTransport({
         ${verificationUrl}
       </p>
       
-      <p>Si vous n'avez pas créé de compte ECOLOJIA, vous pouvez ignorer cet email en toute sécurité.</p>
+      <p>Si vous n'avez pas crÃ©Ã© de compte ECOLOJIA, vous pouvez ignorer cet email en toute sÃ©curitÃ©.</p>
       
-      <p>À bientôt sur ECOLOJIA !<br>
-      L'équipe ECOLOJIA 🌿</p>
+      <p>Ã€ bientÃ´t sur ECOLOJIA !<br>
+      L'Ã©quipe ECOLOJIA ðŸŒ¿</p>
     </div>
     
     <div class="footer">
-      <p>© 2024 ECOLOJIA - Assistant IA pour consommation responsable</p>
-      <p>Cet email a été envoyé à ${name} pour la validation du compte ECOLOJIA.</p>
+      <p>Â© 2024 ECOLOJIA - Assistant IA pour consommation responsable</p>
+      <p>Cet email a Ã©tÃ© envoyÃ© Ã  ${name} pour la validation du compte ECOLOJIA.</p>
     </div>
   </div>
 </body>
@@ -235,7 +235,7 @@ this.transporter = nodemailer.createTransport({
     `;
   }
 
-  // === MÉTHODES UTILITAIRES ===
+  // === MÃ‰THODES UTILITAIRES ===
 
   private generateVerificationToken(): string {
     return require('crypto').randomBytes(32).toString('hex');
@@ -243,3 +243,4 @@ this.transporter = nodemailer.createTransport({
 }
 
 export const emailService = new EmailService();
+

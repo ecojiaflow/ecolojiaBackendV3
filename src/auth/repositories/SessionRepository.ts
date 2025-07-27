@@ -1,4 +1,4 @@
-// 🔴 BACKEND - backend/src/auth/repositories/SessionRepository.ts
+﻿// ðŸ”´ BACKEND - backend/src/auth/repositories/SessionRepository.ts
 
 import { Session } from '../types/AuthTypes';
 import { v4 as uuidv4 } from 'uuid';
@@ -59,4 +59,4 @@ export class SessionRepository {
       }
     }
   }
-}
+

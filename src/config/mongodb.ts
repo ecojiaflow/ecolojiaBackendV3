@@ -20,7 +20,7 @@ export const connectMongoDB = async () => {
     await mongoose.connect(uri, options);
     
     console.log('✅ MongoDB Atlas connected successfully');
-    console.log(`📍 Connected to database: ${mongoose.connection.db.databaseName}`);
+    console.log(`📍 Connected to database: ${mongoose.connection.db?.databaseName || "ecolojia"}`);
     
     // Event listeners pour monitoring
     mongoose.connection.on('error', (error) => {

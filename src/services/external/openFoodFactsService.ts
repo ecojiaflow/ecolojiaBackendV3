@@ -1,4 +1,4 @@
-// PATH: backend/src/services/external/openFoodFactsService.ts
+﻿// PATH: backend/src/services/external/openFoodFactsService.ts
 import axios from 'axios';
 import { ProductData } from '../ai/barcodeAnalyzer';
 
@@ -18,7 +18,7 @@ export class OpenFoodFactsService {
   
   static async getProduct(barcode: string): Promise<ProductData | null> {
     try {
-      console.log(`🔍 Recherche OpenFoodFacts: ${barcode}`);
+      console.log(`ðŸ” Recherche OpenFoodFacts: ${barcode}`);
       
       const response = await axios.get<{ product: OpenFoodFactsProduct; status: number }>(
         `${this.BASE_URL}/${barcode}.json`,
@@ -44,7 +44,7 @@ export class OpenFoodFactsService {
         };
       }
 
-      console.log(`❌ Produit non trouvé dans OpenFoodFacts: ${barcode}`);
+      console.log(`âŒ Produit non trouvÃ© dans OpenFoodFacts: ${barcode}`);
       return null;
 
     } catch (error) {
@@ -86,4 +86,6 @@ export class OpenFoodFactsService {
       return [];
     }
   }
+
+
 }

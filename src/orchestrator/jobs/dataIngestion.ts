@@ -1,24 +1,24 @@
-// PATH: backend/src/orchestrator/jobs/dataIngestion.ts
-import { PrismaClient } from '@prisma/client';
+﻿// PATH: backend/src/orchestrator/jobs/dataIngestion.ts
+// // import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
 
-const prisma = new PrismaClient();
+const prisma = null // new PrismaClient();
 
 export class DataIngestionJob {
   private readonly BATCH_SIZE = 100;
   private readonly RATE_LIMIT_DELAY = 1000; // 1 seconde entre les batches
 
   async ingestProducts(source: string = 'openfoodfacts') {
-    console.log(`🔄 Début ingestion données depuis ${source}`);
+    console.log(`ðŸ”„ DÃ©but ingestion donnÃ©es depuis ${source}`);
     
     try {
       const products = await this.fetchProductsFromSource(source);
-      console.log(`📦 ${products.length} produits récupérés`);
+      console.log(`ðŸ“¦ ${products.length} produits rÃ©cupÃ©rÃ©s`);
       
       await this.processBatches(products, source);
-      console.log(`✅ Ingestion terminée pour ${source}`);
+      console.log(`âœ… Ingestion terminÃ©e pour ${source}`);
     } catch (error) {
-      console.error(`❌ Erreur ingestion ${source}:`, error);
+      console.error(`âŒ Erreur ingestion ${source}:`, error);
       throw error;
     }
   }
@@ -30,7 +30,7 @@ export class DataIngestionJob {
       case 'mock':
         return this.generateMockProducts();
       default:
-        throw new Error(`Source non supportée: ${source}`);
+        throw new Error(`Source non supportÃ©e: ${source}`);
     }
   }
 
@@ -56,8 +56,8 @@ export class DataIngestionJob {
         code: '3017620422003',
         product_name: 'Nutella',
         brands: 'Ferrero',
-        categories: 'Pâtes à tartiner',
-        ingredients_text: 'Sucre, huile de palme, noisettes, cacao, lait écrémé',
+        categories: 'PÃ¢tes Ã  tartiner',
+        ingredients_text: 'Sucre, huile de palme, noisettes, cacao, lait Ã©crÃ©mÃ©',
         image_url: 'https://example.com/nutella.jpg',
         nutrition_grades: 'e'
       },
@@ -66,7 +66,7 @@ export class DataIngestionJob {
         product_name: 'Coca-Cola',
         brands: 'Coca-Cola',
         categories: 'Boissons gazeuses',
-        ingredients_text: 'Eau, sucre, dioxyde de carbone, colorant caramel, arôme',
+        ingredients_text: 'Eau, sucre, dioxyde de carbone, colorant caramel, arÃ´me',
         image_url: 'https://example.com/coca.jpg',
         nutrition_grades: 'e'
       }
@@ -77,7 +77,7 @@ export class DataIngestionJob {
     const batches = this.createBatches(products, this.BATCH_SIZE);
     
     for (let i = 0; i < batches.length; i++) {
-      console.log(`📦 Traitement batch ${i + 1}/${batches.length}`);
+      console.log(`ðŸ“¦ Traitement batch ${i + 1}/${batches.length}`);
       
       await this.processBatch(batches[i], source);
       
@@ -111,23 +111,23 @@ export class DataIngestionJob {
 
   private async processProduct(rawProduct: any, source: string) {
     try {
-      // Calculer eco-score simplifié
+      // Calculer eco-score simplifiÃ©
       const ecoScore = {
         eco_score: 50,
         ai_confidence: 0.7
       };
 
-      // ✅ CORRECTION: Utiliser "verified" au lieu de "ai_verified"
+      // âœ… CORRECTION: Utiliser "verified" au lieu de "ai_verified"
       const processedProduct = {
         id: rawProduct.code,
         title: rawProduct.product_name || 'Produit sans nom',
         description: rawProduct.ingredients_text || 'Aucune description',
         slug: this.generateSlug(rawProduct.product_name || 'produit'),
         brand: rawProduct.brands || 'Marque inconnue',
-        category: rawProduct.categories || 'Non classé',
+        category: rawProduct.categories || 'Non classÃ©',
         tags: this.extractTags(rawProduct.categories || ''),
         images: rawProduct.image_url ? [rawProduct.image_url] : [],
-        zones_dispo: ['FR'], // Par défaut France
+        zones_dispo: ['FR'], // Par dÃ©faut France
         prices: {
           default: 0,
           currency: 'EUR'
@@ -135,14 +135,14 @@ export class DataIngestionJob {
         eco_score: ecoScore.eco_score,
         nutritional_score: this.mapNutritionalGrade(rawProduct.nutrition_grades),
         ingredients: rawProduct.ingredients_text || '',
-        verified_status: 'verified' as const, // ✅ CORRECTION: "verified" au lieu de "ai_verified"
+        verified_status: 'verified' as const, // âœ… CORRECTION: "verified" au lieu de "ai_verified"
         ai_confidence: ecoScore.ai_confidence,
         source: source
       };
 
       return processedProduct;
     } catch (error) {
-      console.error(`❌ Erreur traitement produit ${rawProduct.code}:`, error);
+      console.error(`âŒ Erreur traitement produit ${rawProduct.code}:`, error);
       return null;
     }
   }
@@ -161,7 +161,7 @@ export class DataIngestionJob {
       .split(',')
       .map(cat => cat.trim().toLowerCase())
       .filter(cat => cat.length > 0)
-      .slice(0, 5); // Limiter à 5 tags
+      .slice(0, 5); // Limiter Ã  5 tags
   }
 
   private mapNutritionalGrade(grade: string): number {
@@ -178,14 +178,14 @@ export class DataIngestionJob {
 
   private async saveProducts(products: any[]) {
     try {
-      await prisma.product.createMany({
+      // await prisma.product.createMany({ // PRISMA DISABLED
         data: products,
         skipDuplicates: true
       });
       
-      console.log(`💾 ${products.length} produits sauvegardés`);
+      console.log(`ðŸ’¾ ${products.length} produits sauvegardÃ©s`);
     } catch (error) {
-      console.error('❌ Erreur sauvegarde produits:', error);
+      console.error('âŒ Erreur sauvegarde produits:', error);
       throw error;
     }
   }
@@ -195,10 +195,11 @@ export class DataIngestionJob {
   }
 
   async cleanup() {
-    await prisma.$disconnect();
+    // // await prisma.$disconnect(); // PRISMA DISABLED // PRISMA DISABLED
   }
 }
 
 // Export pour utilisation dans d'autres modules
 export default DataIngestionJob;
 // EOF
+

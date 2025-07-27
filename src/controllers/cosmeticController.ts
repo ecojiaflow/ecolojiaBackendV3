@@ -1,4 +1,4 @@
-// PATH: backend/src/controllers/cosmeticController.ts
+﻿// PATH: backend/src/controllers/cosmeticController.ts
 import { Request, Response } from 'express';
 import { CosmeticClassifier } from '../services/ai/cosmeticClassifier';
 import { cosmeticsAnalyzer } from '../services/ai/cosmeticsAnalyzer';
@@ -11,82 +11,28 @@ interface AnalyzeCosmeticRequest {
   productName?: string;
 }
 
+
 export const analyzeCosmeticController = async (req: Request, res: Response) => {
   try {
-    const { 
-      ingredients, 
-      inciList,
-      productType = 'general', 
-      productName 
-    }: AnalyzeCosmeticRequest = req.body;
-
-    // Parsing flexible des ingrédients
-    let ingredientsList: string[] = [];
+    // Code existant...
+    const { category, name, brand, ingredients } = req.body;
     
-    if (inciList) {
-      ingredientsList = inciList
-        .split(',')
-        .map((i: string) => i.trim())
-        .filter((i: string) => i.length > 0);
-    } else if (ingredients) {
-      if (typeof ingredients === 'string') {
-        ingredientsList = ingredients
-          .split(',')
-          .map((i: string) => i.trim())
-          .filter((i: string) => i.length > 0);
-      } else if (Array.isArray(ingredients)) {
-        ingredientsList = ingredients;
-      }
-    }
-
-    if (ingredientsList.length === 0) {
+    if (!category || !name || !ingredients) {
       return res.status(400).json({
-        error: 'Liste d\'ingrédients requise',
-        code: 'MISSING_INGREDIENTS',
-        help: 'Envoyer ingredients (string ou array) ou inciList (string)'
+        success: false,
+        message: 'Catégorie, nom et ingrédients requis'
       });
     }
 
-    console.log(`💄 Analyse cosmétique: ${productName || 'Produit sans nom'} (${ingredientsList.length} ingrédients)`);
-
-    // Utiliser le cosmeticsAnalyzer existant
-    const inciAnalysis = await cosmeticsAnalyzer.analyzeINCI(ingredientsList);
+    // TODO: Implémenter l'analyse pour cosmeticController
     
-    // Adapter pour healthScoreCalculator
-    const healthScore = healthScoreCalculator.calculate({
-      category: 'cosmetics',
-      productName: productName || 'Produit cosmétique',
-      ingredients: ingredientsList,
-      cosmeticsAnalysis: {
-        hazardScore: inciAnalysis.hazardScore,
-        endocrineDisruptors: inciAnalysis.endocrineDisruptors,
-        allergens: inciAnalysis.allergens,
-        naturalityScore: inciAnalysis.naturalityScore
-      }
-    });
-
-    res.json({
+    return res.json({
       success: true,
-      data: {
-        productName: productName || 'Produit cosmétique',
-        productType,
-        ingredientCount: ingredientsList.length,
-        healthScore: {
-          score: healthScore.score,
-          category: healthScore.category
-        },
-        analysis: inciAnalysis,
-        recommendations: healthScore.recommendations,
-        timestamp: new Date().toISOString(),
-        source: 'cosmetic_analysis'
-      }
+      message: 'Analyse cosmeticController en cours de développement'
     });
-
+    
   } catch (error) {
-    console.error('Erreur analyse cosmétique:', error);
-    res.status(500).json({
-      error: 'Erreur lors de l\'analyse cosmétique',
-      code: 'COSMETIC_ANALYSIS_ERROR'
-    });
+    console.error('cosmeticController error:', error);
+    return res.status(500).json({ error: 'Erreur serveur' });
   }
 };

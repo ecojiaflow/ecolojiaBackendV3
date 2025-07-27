@@ -21,7 +21,7 @@ const connectMongoDB = async () => {
         };
         await mongoose_1.default.connect(uri, options);
         console.log('✅ MongoDB Atlas connected successfully');
-        console.log(`📍 Connected to database: ${mongoose_1.default.connection.db.databaseName}`);
+        console.log(`📍 Connected to database: ${mongoose_1.default.connection.db?.databaseName || "ecolojia"}`);
         // Event listeners pour monitoring
         mongoose_1.default.connection.on('error', (error) => {
             console.error('❌ MongoDB connection error:', error);

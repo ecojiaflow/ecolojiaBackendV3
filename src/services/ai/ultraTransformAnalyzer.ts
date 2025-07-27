@@ -123,10 +123,13 @@ export class UltraTransformAnalyzer {
       }
     });
     
-    // Additifs
+    // Additifs - CORRECTION ICI
     const adds = ingsStr.match(/e\d{3,4}/gi) || [];
     adds.forEach(a => {
-      markers.push({ desc: `Additif: ${a.toUpperCase()}`, level: 3 });
+      markers.push({ 
+        desc: `Additif: ${String(a).toUpperCase()}`, // ✅ CORRECTION: String(a) au lieu de a directement
+        level: 3 
+      });
     });
     
     // Termes process

@@ -1,6 +1,6 @@
 // PATH: src/services/algoliaService.ts
 import algoliasearch from 'algoliasearch';
-import { PrismaClient } from '@prisma/client';
+// // import { PrismaClient } from '@prisma/client';
 
 // Configuration Algolia depuis les variables d'environnement
 const client = algoliasearch(

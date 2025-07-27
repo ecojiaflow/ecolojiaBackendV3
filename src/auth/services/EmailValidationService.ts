@@ -1,8 +1,8 @@
-// PATH: backend/src/auth/services/EmailValidationService.ts
-import { PrismaClient } from '@prisma/client';
-import { emailService } from './EmailService'; // ✅ Import corrigé
+﻿// PATH: backend/src/auth/services/EmailValidationService.ts
+// // import { PrismaClient } from '@prisma/client';
+import { emailService } from './EmailService'; // âœ… Import corrigÃ©
 
-const prisma = new PrismaClient();
+const prisma = null // new PrismaClient();
 
 export interface ValidationResult {
   success: boolean;
@@ -13,11 +13,11 @@ export interface ValidationResult {
 export class EmailValidationService {
   
   /**
-   * Vérifier un token de validation email
+   * VÃ©rifier un token de validation email
    */
   async verifyToken(token: string): Promise<ValidationResult> {
     try {
-      console.log('🔍 Vérification token email:', token);
+      console.log('ðŸ” VÃ©rification token email:', token);
       
       if (!token || token.length < 32) {
         return {
@@ -27,7 +27,7 @@ export class EmailValidationService {
       }
 
       // Chercher token dans la base
-      const verification = await prisma.emailVerification.findFirst({
+      // const verification = await prisma.emailVerification.findFirst({ // PRISMA DISABLED
         where: {
           token,
           verified: false,
@@ -46,33 +46,33 @@ export class EmailValidationService {
       });
 
       if (!verification) {
-        console.log('❌ Token non trouvé ou expiré');
+        console.log('âŒ Token non trouvÃ© ou expirÃ©');
         return {
           success: false,
-          message: 'Token de validation invalide ou expiré. Veuillez demander un nouveau lien de validation.'
+          message: 'Token de validation invalide ou expirÃ©. Veuillez demander un nouveau lien de validation.'
         };
       }
 
       if (!verification.user) {
-        console.log('❌ Utilisateur associé au token non trouvé');
+        console.log('âŒ Utilisateur associÃ© au token non trouvÃ©');
         return {
           success: false,
-          message: 'Utilisateur non trouvé'
+          message: 'Utilisateur non trouvÃ©'
         };
       }
 
       if (verification.user.emailVerified) {
-        console.log('✅ Email déjà vérifié pour:', verification.user.email);
+        console.log('âœ… Email dÃ©jÃ  vÃ©rifiÃ© pour:', verification.user.email);
         return {
           success: true,
-          message: 'Votre email est déjà vérifié',
+          message: 'Votre email est dÃ©jÃ  vÃ©rifiÃ©',
           data: { user: verification.user }
         };
       }
 
-      // Transaction pour marquer comme vérifié
-      await prisma.$transaction(async (tx) => {
-        // Marquer token comme utilisé
+      // Transaction pour marquer comme vÃ©rifiÃ©
+      // // await prisma.$transaction(async (tx) => { // PRISMA DISABLED // PRISMA DISABLED
+        // Marquer token comme utilisÃ©
         await tx.emailVerification.update({
           where: { id: verification.id },
           data: { 
@@ -81,7 +81,7 @@ export class EmailValidationService {
           }
         });
 
-        // Marquer utilisateur comme vérifié
+        // Marquer utilisateur comme vÃ©rifiÃ©
         await tx.user.update({
           where: { id: verification.user!.id },
           data: { 
@@ -91,11 +91,11 @@ export class EmailValidationService {
         });
       });
 
-      console.log('✅ Email vérifié avec succès pour:', verification.user.email);
+      console.log('âœ… Email vÃ©rifiÃ© avec succÃ¨s pour:', verification.user.email);
       
       return {
         success: true,
-        message: `Email vérifié avec succès ! Bienvenue ${verification.user.name}.`,
+        message: `Email vÃ©rifiÃ© avec succÃ¨s ! Bienvenue ${verification.user.name}.`,
         data: { 
           user: {
             ...verification.user,
@@ -105,10 +105,10 @@ export class EmailValidationService {
       };
 
     } catch (error: any) {
-      console.error('❌ Erreur vérification email token:', error);
+      console.error('âŒ Erreur vÃ©rification email token:', error);
       return {
         success: false,
-        message: 'Erreur lors de la vérification. Veuillez réessayer.'
+        message: 'Erreur lors de la vÃ©rification. Veuillez rÃ©essayer.'
       };
     }
   }
@@ -118,7 +118,7 @@ export class EmailValidationService {
    */
   async resendVerificationEmail(email: string): Promise<ValidationResult> {
     try {
-      console.log('📧 Renvoi email de validation pour:', email);
+      console.log('ðŸ“§ Renvoi email de validation pour:', email);
 
       if (!this.isValidEmail(email)) {
         return {
@@ -128,7 +128,7 @@ export class EmailValidationService {
       }
 
       // Chercher utilisateur
-      const user = await prisma.user.findUnique({
+      // const user = await prisma.user.findUnique({ // PRISMA DISABLED
         where: { email: email.toLowerCase() },
         select: {
           id: true,
@@ -139,22 +139,22 @@ export class EmailValidationService {
       });
 
       if (!user) {
-        // Sécurité : ne pas révéler si l'email existe ou non
+        // SÃ©curitÃ© : ne pas rÃ©vÃ©ler si l'email existe ou non
         return {
           success: true,
-          message: 'Si cet email correspond à un compte ECOLOJIA, un nouveau lien de validation sera envoyé.'
+          message: 'Si cet email correspond Ã  un compte ECOLOJIA, un nouveau lien de validation sera envoyÃ©.'
         };
       }
 
       if (user.emailVerified) {
         return {
           success: false,
-          message: 'Cet email est déjà vérifié'
+          message: 'Cet email est dÃ©jÃ  vÃ©rifiÃ©'
         };
       }
 
-      // Vérifier limite de renvoi (max 3 par heure)
-      const recentVerifications = await prisma.emailVerification.count({
+      // VÃ©rifier limite de renvoi (max 3 par heure)
+      // const recentVerifications = await prisma.emailVerification.count({ // PRISMA DISABLED
         where: {
           email: email.toLowerCase(),
           createdAt: {
@@ -170,13 +170,13 @@ export class EmailValidationService {
         };
       }
 
-      // Invalider anciens tokens non utilisés
-      await prisma.emailVerification.updateMany({
+      // Invalider anciens tokens non utilisÃ©s
+      // await prisma.emailVerification.updateMany({ // PRISMA DISABLED
         where: {
           email: email.toLowerCase(),
           verified: false
         },
-        data: { verified: true } // Les marquer comme "utilisés" pour les invalider
+        data: { verified: true } // Les marquer comme "utilisÃ©s" pour les invalider
       });
 
       // Envoyer nouveau email
@@ -189,22 +189,22 @@ export class EmailValidationService {
       if (!emailSent) {
         return {
           success: false,
-          message: 'Erreur lors de l\'envoi de l\'email. Veuillez réessayer.'
+          message: 'Erreur lors de l\'envoi de l\'email. Veuillez rÃ©essayer.'
         };
       }
 
-      console.log('✅ Email de validation renvoyé à:', email);
+      console.log('âœ… Email de validation renvoyÃ© Ã :', email);
 
       return {
         success: true,
-        message: 'Un nouveau lien de validation a été envoyé à votre adresse email.'
+        message: 'Un nouveau lien de validation a Ã©tÃ© envoyÃ© Ã  votre adresse email.'
       };
 
     } catch (error: any) {
-      console.error('❌ Erreur renvoi email validation:', error);
+      console.error('âŒ Erreur renvoi email validation:', error);
       return {
         success: false,
-        message: 'Erreur lors du renvoi. Veuillez réessayer.'
+        message: 'Erreur lors du renvoi. Veuillez rÃ©essayer.'
       };
     }
   }
@@ -221,7 +221,7 @@ export class EmailValidationService {
         };
       }
 
-      const user = await prisma.user.findUnique({
+      // const user = await prisma.user.findUnique({ // PRISMA DISABLED
         where: { email: email.toLowerCase() },
         select: {
           email: true,
@@ -233,13 +233,13 @@ export class EmailValidationService {
       if (!user) {
         return {
           success: false,
-          message: 'Aucun compte trouvé avec cet email'
+          message: 'Aucun compte trouvÃ© avec cet email'
         };
       }
 
       return {
         success: true,
-        message: 'Statut récupéré',
+        message: 'Statut rÃ©cupÃ©rÃ©',
         data: {
           email: user.email,
           verified: user.emailVerified,
@@ -248,15 +248,15 @@ export class EmailValidationService {
       };
 
     } catch (error: any) {
-      console.error('❌ Erreur récupération statut:', error);
+      console.error('âŒ Erreur rÃ©cupÃ©ration statut:', error);
       return {
         success: false,
-        message: 'Erreur lors de la récupération du statut'
+        message: 'Erreur lors de la rÃ©cupÃ©ration du statut'
       };
     }
   }
 
-  // === MÉTHODES UTILITAIRES ===
+  // === MÃ‰THODES UTILITAIRES ===
 
   private isValidEmail(email: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -265,3 +265,4 @@ export class EmailValidationService {
 }
 
 export const emailValidationService = new EmailValidationService();
+

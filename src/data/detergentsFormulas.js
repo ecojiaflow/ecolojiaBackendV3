@@ -13,7 +13,6 @@ class DetergentsFormulasDatabase {
     return {
       // === TENSIOACTIFS ANIONIQUES ===
       'linear alkylbenzene sulfonate': {
-        name: 'Linear Alkylbenzene Sulfonate ('linear alkylbenzene sulfonate': {
         name: 'Linear Alkylbenzene Sulfonate (LAS)',
         type: 'anionic',
         performance: 'excellent',
@@ -466,14 +465,14 @@ class DetergentsFormulasDatabase {
 
   searchEcoFriendly(min_safety_score = 80) {
     const ecoSurfactants = Object.entries(this.surfactants)
-      .filter(([key, surfactant]) => 
+      .filter(([key, surfactant]) =>
         surfactant.safety_score >= min_safety_score &&
         surfactant.biodegradability === 'excellent'
       )
       .map(([key, surfactant]) => ({ name: key, ...surfactant }));
 
     const ecoAdditives = Object.entries(this.additives)
-      .filter(([key, additive]) => 
+      .filter(([key, additive]) =>
         additive.safety_score >= min_safety_score &&
         additive.environmental_impact === 'low'
       )
@@ -487,7 +486,7 @@ class DetergentsFormulasDatabase {
     if (!ingredient) return [];
 
     const surfactantAlternatives = Object.entries(this.surfactants)
-      .filter(([key, surf]) => 
+      .filter(([key, surf]) =>
         surf.type === ingredient.type &&
         surf.safety_score >= min_safety_score &&
         key !== ingredient_name.toLowerCase()
@@ -495,7 +494,7 @@ class DetergentsFormulasDatabase {
       .map(([key, surf]) => ({ name: key, ...surf }));
 
     const additiveAlternatives = Object.entries(this.additives)
-      .filter(([key, add]) => 
+      .filter(([key, add]) =>
         add.function === ingredient.function &&
         add.safety_score >= min_safety_score &&
         key !== ingredient_name.toLowerCase()
@@ -539,7 +538,7 @@ class DetergentsFormulasDatabase {
     for (const ingredient of ingredients_list) {
       const surfactant = this.getSurfactant(ingredient);
       const additive = this.getAdditive(ingredient);
-      
+
       if (surfactant) {
         analysis.surfactants_detected.push({
           name: ingredient,
@@ -598,7 +597,7 @@ class DetergentsFormulasDatabase {
 
   generateSafetyReport(ingredients_list) {
     const analysis = this.analyzeFormulation(ingredients_list);
-    
+
     return {
       ...analysis,
       risk_assessment: this.assessRiskLevel(analysis),
@@ -625,7 +624,7 @@ class DetergentsFormulasDatabase {
     };
 
     // Vérification interdiction phosphates EU
-    const hasPhosphates = analysis.additives_detected.some(a => 
+    const hasPhosphates = analysis.additives_detected.some(a =>
       a.name.includes('phosphate') && a.function.includes('Builder')
     );
     if (hasPhosphates) {
@@ -643,14 +642,14 @@ class DetergentsFormulasDatabase {
       recommendations.push('Privilégier tensioactifs APG ou coco glucoside');
     }
 
-    const hasOpticalBrighteners = analysis.additives_detected.some(a => 
+    const hasOpticalBrighteners = analysis.additives_detected.some(a =>
       a.name.includes('optical brightener')
     );
     if (hasOpticalBrighteners) {
       recommendations.push('Remplacer azurants optiques par percarbonate sodium');
     }
 
-    const hasEDTA = analysis.additives_detected.some(a => a.name.includes('edta'));
+    const hasEDTA = analysis.additives_detected.some(a => a.name && a.name.includes('edta'));
     if (hasEDTA) {
       recommendations.push('Remplacer EDTA par MGDA ou citrates');
     }
@@ -669,7 +668,7 @@ class DetergentsFormulasDatabase {
       total_surfactants: totalSurfactants,
       eco_surfactants: ecoSurfactants,
       eco_surfactants_percentage: Math.round((ecoSurfactants / totalSurfactants) * 100),
-      total_additives: totalAdditives,
+      total_additives: Object.keys(this.additives).length,
       eco_additives: ecoAdditives,
       eco_additives_percentage: Math.round((ecoAdditives / totalAdditives) * 100),
       diy_recipes_available: Object.keys(this.diyRecipes).length,
@@ -679,19 +678,4 @@ class DetergentsFormulasDatabase {
 }
 
 // Export singleton
-module.exports = new DetergentsFormulasDatabase();// backend/src/data/detergentsFormulas.js
-// Base de données formules et ingrédients détergents
-
-class DetergentsFormulasDatabase {
-  constructor() {
-    this.surfactants = this.initializeSurfactantsDatabase();
-    this.additives = this.initializeAdditivesDatabase();
-    this.diyRecipes = this.initializeDIYRecipes();
-    this.ecoStandards = this.initializeEcoStandards();
-  }
-
-  initializeSurfactantsDatabase() {
-    return {
-      // === TENSIOACTIFS ANIONIQUES ===
-      'linear alkylbenzene sulfonate': {
-        name: 'Linear Alkylbenzene Sulfonate (
+module.exports = new DetergentsFormulasDatabase();

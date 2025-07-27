@@ -1,3 +1,4 @@
+﻿import { Request, Response } from 'express';
 // PATH: backend/src/routes/eco-score.routes.ts
 import express from 'express';
 import { EcoScoreService } from '../services/eco-score.service';
@@ -8,7 +9,7 @@ const router = express.Router();
  * @swagger
  * /api/eco-score/calculate:
  *   post:
- *     summary: Calcule l'éco-score d'un produit
+ *     summary: Calcule l'Ã©co-score d'un produit
  *     tags: [EcoScore]
  *     requestBody:
  *       required: true
@@ -27,13 +28,13 @@ const router = express.Router();
  *                 type: string
  *     responses:
  *       200:
- *         description: Éco-score calculé avec succès
+ *         description: Ã‰co-score calculÃ© avec succÃ¨s
  *       400:
- *         description: Données invalides
+ *         description: DonnÃ©es invalides
  *       500:
  *         description: Erreur serveur
  */
-router.post('/calculate', async (req, res) => {
+router.post('/calculate', async (req: Request, res: Response) => {
   try {
     const { id, title, ingredients, category } = req.body;
     
@@ -56,7 +57,7 @@ router.post('/calculate', async (req, res) => {
       data: result
     });
   } catch (error: any) {
-    console.error('❌ Erreur calcul eco-score:', error);
+    console.error('âŒ Erreur calcul eco-score:', error); return res.status(500).json({ error: "Erreur serveur" });
     res.status(500).json({ 
       error: 'Erreur calcul eco-score',
       message: error.message 
@@ -68,20 +69,20 @@ router.post('/calculate', async (req, res) => {
  * @swagger
  * /api/eco-score/update-all:
  *   post:
- *     summary: Met à jour tous les éco-scores
+ *     summary: Met Ã  jour tous les Ã©co-scores
  *     tags: [EcoScore]
  *     responses:
  *       200:
- *         description: Mise à jour réussie
+ *         description: Mise Ã  jour rÃ©ussie
  *       500:
  *         description: Erreur serveur
  */
-router.post('/update-all', async (req, res) => {
+router.post('/update-all', async (req: Request, res: Response) => {
   try {
     const ecoScoreService = new EcoScoreService();
     
-    // ✅ CORRECTION: Utiliser la méthode qui existe
-    const categories = ['alimentaire', 'cosmétique', 'détergent'];
+    // âœ… CORRECTION: Utiliser la mÃ©thode qui existe
+    const categories = ['alimentaire', 'cosmÃ©tique', 'dÃ©tergent'];
     let totalUpdated = 0;
     
     for (const category of categories) {
@@ -91,13 +92,13 @@ router.post('/update-all', async (req, res) => {
     
     res.json({
       success: true,
-      message: `${totalUpdated} scores mis à jour`,
+      message: `${totalUpdated} scores mis Ã  jour`,
       updated: totalUpdated
     });
   } catch (error: any) {
-    console.error('❌ Erreur mise à jour globale:', error);
+    console.error('âŒ Erreur mise Ã  jour globale:', error); return res.status(500).json({ error: "Erreur serveur" });
     res.status(500).json({ 
-      error: 'Erreur mise à jour globale',
+      error: 'Erreur mise Ã  jour globale',
       message: error.message 
     });
   }
@@ -107,7 +108,7 @@ router.post('/update-all', async (req, res) => {
  * @swagger
  * /api/eco-score/product/{id}:
  *   get:
- *     summary: Récupère l'éco-score d'un produit
+ *     summary: RÃ©cupÃ¨re l'Ã©co-score d'un produit
  *     tags: [EcoScore]
  *     parameters:
  *       - in: path
@@ -117,13 +118,13 @@ router.post('/update-all', async (req, res) => {
  *           type: string
  *     responses:
  *       200:
- *         description: Éco-score récupéré
+ *         description: Ã‰co-score rÃ©cupÃ©rÃ©
  *       404:
- *         description: Produit non trouvé
+ *         description: Produit non trouvÃ©
  *       500:
  *         description: Erreur serveur
  */
-router.get('/product/:id', async (req, res) => {
+router.get('/product/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     
@@ -132,7 +133,7 @@ router.get('/product/:id', async (req, res) => {
     
     if (!result) {
       return res.status(404).json({ 
-        error: 'Produit non trouvé' 
+        error: 'Produit non trouvÃ©' 
       });
     }
     
@@ -141,9 +142,9 @@ router.get('/product/:id', async (req, res) => {
       data: result
     });
   } catch (error: any) {
-    console.error('❌ Erreur récupération score:', error);
+    console.error('âŒ Erreur rÃ©cupÃ©ration score:', error); return res.status(500).json({ error: "Erreur serveur" });
     res.status(500).json({ 
-      error: 'Erreur récupération score',
+      error: 'Erreur rÃ©cupÃ©ration score',
       message: error.message 
     });
   }
@@ -153,7 +154,7 @@ router.get('/product/:id', async (req, res) => {
  * @swagger
  * /api/eco-score/product/{id}/update:
  *   post:
- *     summary: Met à jour l'éco-score d'un produit spécifique
+ *     summary: Met Ã  jour l'Ã©co-score d'un produit spÃ©cifique
  *     tags: [EcoScore]
  *     parameters:
  *       - in: path
@@ -163,31 +164,31 @@ router.get('/product/:id', async (req, res) => {
  *           type: string
  *     responses:
  *       200:
- *         description: Score mis à jour
+ *         description: Score mis Ã  jour
  *       404:
- *         description: Produit non trouvé
+ *         description: Produit non trouvÃ©
  *       500:
  *         description: Erreur serveur
  */
-router.post('/product/:id/update', async (req, res) => {
+router.post('/product/:id/update', async (req: Request, res: Response) => {
   try {
     const { id: productId } = req.params;
     
     const ecoScoreService = new EcoScoreService();
     
-    // ✅ CORRECTION: Récupérer le produit d'abord, puis calculer
+    // âœ… CORRECTION: RÃ©cupÃ©rer le produit d'abord, puis calculer
     const existingScore = await ecoScoreService.getProductScore(productId);
     
     if (!existingScore) {
       return res.status(404).json({ 
-        error: 'Produit non trouvé' 
+        error: 'Produit non trouvÃ©' 
       });
     }
     
-    // Recalculer le score (logique simplifiée)
+    // Recalculer le score (logique simplifiÃ©e)
     const updatedScore = await ecoScoreService.calculate({
       id: productId,
-      title: 'Produit à actualiser',
+      title: 'Produit Ã  actualiser',
       ingredients: '',
       category: ''
     });
@@ -196,13 +197,13 @@ router.post('/product/:id/update', async (req, res) => {
     
     res.json({
       success: true,
-      message: 'Score mis à jour',
+      message: 'Score mis Ã  jour',
       data: updatedScore
     });
   } catch (error: any) {
-    console.error('❌ Erreur mise à jour produit:', error);
+    console.error('âŒ Erreur mise Ã  jour produit:', error); return res.status(500).json({ error: "Erreur serveur" });
     res.status(500).json({ 
-      error: 'Erreur mise à jour produit',
+      error: 'Erreur mise Ã  jour produit',
       message: error.message 
     });
   }
@@ -212,7 +213,7 @@ router.post('/product/:id/update', async (req, res) => {
  * @swagger
  * /api/eco-score/batch:
  *   post:
- *     summary: Calcule l'éco-score pour plusieurs produits
+ *     summary: Calcule l'Ã©co-score pour plusieurs produits
  *     tags: [EcoScore]
  *     requestBody:
  *       required: true
@@ -236,13 +237,13 @@ router.post('/product/:id/update', async (req, res) => {
  *                       type: string
  *     responses:
  *       200:
- *         description: Scores calculés
+ *         description: Scores calculÃ©s
  *       400:
- *         description: Données invalides
+ *         description: DonnÃ©es invalides
  *       500:
  *         description: Erreur serveur
  */
-router.post('/batch', async (req, res) => {
+router.post('/batch', async (req: Request, res: Response) => {
   try {
     const { products } = req.body;
     
@@ -254,7 +255,7 @@ router.post('/batch', async (req, res) => {
     
     const ecoScoreService = new EcoScoreService();
     
-    // ✅ CORRECTION: Utiliser la méthode qui existe
+    // âœ… CORRECTION: Utiliser la mÃ©thode qui existe
     const results = await ecoScoreService.batchCalculate(products);
     
     res.json({
@@ -263,7 +264,7 @@ router.post('/batch', async (req, res) => {
       count: results.length
     });
   } catch (error: any) {
-    console.error('❌ Erreur calcul batch:', error);
+    console.error('âŒ Erreur calcul batch:', error); return res.status(500).json({ error: "Erreur serveur" });
     res.status(500).json({ 
       error: 'Erreur calcul batch',
       message: error.message 
@@ -275,36 +276,36 @@ router.post('/batch', async (req, res) => {
  * @swagger
  * /api/eco-score/test:
  *   post:
- *     summary: Test du calcul d'éco-score
+ *     summary: Test du calcul d'Ã©co-score
  *     tags: [EcoScore]
  *     responses:
  *       200:
- *         description: Test réussi
+ *         description: Test rÃ©ussi
  *       500:
  *         description: Erreur serveur
  */
-router.post('/test', async (req, res) => {
+router.post('/test', async (req: Request, res: Response) => {
   try {
     const testProduct = {
       id: 'test-product-001',
       title: 'Produit test eco-score',
-      ingredients: 'sucre, huile de palme, E471, arômes artificiels',
+      ingredients: 'sucre, huile de palme, E471, arÃ´mes artificiels',
       category: 'alimentaire'
     };
     
     const ecoScoreService = new EcoScoreService();
     
-    // ✅ CORRECTION: Utiliser la méthode qui existe
+    // âœ… CORRECTION: Utiliser la mÃ©thode qui existe
     const result = await ecoScoreService.calculate(testProduct);
     
     res.json({
       success: true,
-      message: 'Test eco-score réussi',
+      message: 'Test eco-score rÃ©ussi',
       testProduct,
       result
     });
   } catch (error: any) {
-    console.error('❌ Erreur test eco-score:', error);
+    console.error('âŒ Erreur test eco-score:', error); return res.status(500).json({ error: "Erreur serveur" });
     res.status(500).json({ 
       error: 'Erreur test eco-score',
       message: error.message 
@@ -316,15 +317,15 @@ router.post('/test', async (req, res) => {
  * @swagger
  * /api/eco-score/distribution:
  *   get:
- *     summary: Récupère la distribution des éco-scores
+ *     summary: RÃ©cupÃ¨re la distribution des Ã©co-scores
  *     tags: [EcoScore]
  *     responses:
  *       200:
- *         description: Distribution récupérée
+ *         description: Distribution rÃ©cupÃ©rÃ©e
  *       500:
  *         description: Erreur serveur
  */
-router.get('/distribution', async (req, res) => {
+router.get('/distribution', async (req: Request, res: Response) => {
   try {
     const ecoScoreService = new EcoScoreService();
     const distribution = await ecoScoreService.getScoreDistribution();
@@ -334,7 +335,7 @@ router.get('/distribution', async (req, res) => {
       data: distribution
     });
   } catch (error: any) {
-    console.error('❌ Erreur distribution:', error);
+    console.error('âŒ Erreur distribution:', error); return res.status(500).json({ error: "Erreur serveur" });
     res.status(500).json({ 
       error: 'Erreur distribution',
       message: error.message 
@@ -344,3 +345,4 @@ router.get('/distribution', async (req, res) => {
 
 export default router;
 // EOF
+

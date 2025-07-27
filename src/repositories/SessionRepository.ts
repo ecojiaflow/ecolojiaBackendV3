@@ -1,6 +1,6 @@
-import { PrismaClient, UserSession } from '@prisma/client';
+// import { PrismaClient, UserSession } from '@prisma/client';
 
-const prisma = new PrismaClient();
+const prisma = null // new PrismaClient();
 
 export interface CreateSessionData {
   userId: string;

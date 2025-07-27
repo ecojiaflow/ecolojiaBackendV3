@@ -1,17 +1,54 @@
-// PATH: backend/tsconfig.json
-{
+﻿{
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
-    "rootDir": "src",
-    "outDir": "dist",
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
+    "lib": ["ES2020"],
+    "outDir": "./dist",
+    "rootDir": "./src",
     "strict": false,
+    "esModuleInterop": true,
     "skipLibCheck": true,
-    "downlevelIteration": true
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+    "allowJs": true,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "noImplicitReturns": false
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src/index.ts",
+    "src/config/mongodb.ts",
+    "src/config/redis.ts",
+    "src/models/**/*",
+    "src/services/MongoDBService.ts",
+    "src/routes/health.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "src/auth/**/*",
+    "src/controllers/**/*",
+    "src/middleware/**/*",
+    "src/routes/ai.routes.ts",
+    "src/routes/analyze.routes.cached.ts",
+    "src/routes/auth.ts",
+    "src/routes/chat.routes.ts",
+    "src/routes/multiCategory.routes.ts",
+    "src/routes/product.routes.ts",
+    "src/routes/user.routes.ts",
+    "src/routes/partner.routes.ts",
+    "src/routes/eco-score.routes.ts",
+    "src/routes/emailValidation.ts",
+    "src/services/ai/**/*",
+    "src/services/external/**/*",
+    "src/services/eco-score.service.ts",
+    "src/services/product.service.ts",
+    "src/repositories/**/*",
+    "src/lib/**/*",
+    "src/db/**/*",
+    "src/orchestrator/**/*"
+  ]
 }
-// EOF

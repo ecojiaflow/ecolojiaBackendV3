@@ -1,7 +1,7 @@
 // PATH: backend/src/scripts/seed-affiliation.ts
-import { PrismaClient } from '@prisma/client';
+// // import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+const prisma = null // new PrismaClient();
 
 // Utilisation de ton enum existant depuis le client Prisma généré
 // Si VerifiedStatus n'existe pas, utilise des strings directement

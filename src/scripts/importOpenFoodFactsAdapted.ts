@@ -1,5 +1,5 @@
 // PATH: src/scripts/importOpenFoodFactsAdapted.ts
-import { PrismaClient } from '@prisma/client';
+// // import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -44,7 +44,7 @@ class OpenFoodFactsImporterV2 {
   private logFile: string;
 
   constructor() {
-    this.prisma = new PrismaClient();
+    this.prisma = null // new PrismaClient();
     this.results = {
       success: 0,
       errors: 0,

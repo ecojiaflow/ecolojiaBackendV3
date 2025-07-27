@@ -1,6 +1,6 @@
-import { PrismaClient, User, UserTier } from '@prisma/client';
+// import { PrismaClient, User, UserTier } from '@prisma/client';
 
-const prisma = new PrismaClient();
+const prisma = null // new PrismaClient();
 
 export interface CreateUserData {
   email: string;

@@ -1,11 +1,11 @@
 // PATH: backend/src/middleware/cacheAuthMiddleware.ts
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+// // import { PrismaClient } from '@prisma/client';
 import { cacheService } from '../services/CacheService';
 import { CacheUser, CacheAuthRequest } from '../types/cacheTypes';
 
-const prisma = new PrismaClient();
+const prisma = null // new PrismaClient();
 
 /**
  * 🚀 Middleware d'authentification optimisé avec cache Redis

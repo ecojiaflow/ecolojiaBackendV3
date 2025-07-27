@@ -38,7 +38,7 @@ redisClient.on('close', () => {
   logger.warn('⚠️ Redis connection closed');
 });
 
-redisClient.on('reconnecting', (delay) => {
+redisClient.on('reconnecting', (delay: number) => {
   logger.info(`🔄 Redis reconnecting in ${delay}ms`);
 });
 
