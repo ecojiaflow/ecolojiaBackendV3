@@ -1,8 +1,9 @@
-﻿// server.js - Serveur avec dotenv
+﻿// server.js - Serveur principal Ecolojia
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,76 +12,174 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Routes
+// Variable pour stocker l'état de la connexion DB
+let dbConnected = false;
+
+// Stockage en mémoire pour le mode sans DB
+const memoryUsers = [];
+
+// Routes de base
 app.get('/', (req, res) => {
   res.json({
-    message: 'Serveur Ecolojia OK!',
-    timestamp: new Date(),
-    environment: process.env.NODE_ENV || 'development'
+    message: 'API Ecolojia',
+    version: '1.0.0',
+    status: 'operational',
+    database: dbConnected ? 'connected' : 'memory mode',
+    timestamp: new Date()
   });
 });
 
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'healthy',
-    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    uptime: process.uptime(),
+    database: dbConnected ? 'connected' : 'disconnected'
   });
 });
 
-// Route de test auth (simple)
-app.post('/api/auth/register', (req, res) => {
-  const { email, password, name } = req.body;
-  
-  if (!email || !password || !name) {
-    return res.status(400).json({
+// Route inscription
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { email, password, name } = req.body;
+    
+    if (!email || !password || !name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tous les champs sont requis'
+      });
+    }
+
+    // Vérifier si email existe
+    if (memoryUsers.find(u => u.email === email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email déjà utilisé'
+      });
+    }
+
+    // Hash du mot de passe
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Créer utilisateur
+    const user = {
+      id: Date.now().toString(),
+      email,
+      password: hashedPassword,
+      name,
+      tier: 'free',
+      createdAt: new Date()
+    };
+
+    memoryUsers.push(user);
+
+    res.json({
+      success: true,
+      message: 'Inscription réussie',
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        tier: user.tier
+      }
+    });
+
+  } catch (error) {
+    console.error('Erreur inscription:', error);
+    res.status(500).json({
       success: false,
-      message: 'Email, mot de passe et nom requis'
+      message: 'Erreur serveur'
     });
   }
-  
-  // Pour le test, on simule une création réussie
-  res.json({
-    success: true,
-    message: 'Utilisateur créé (mode test)',
-    user: {
-      email,
-      name,
-      tier: 'free'
-    }
-  });
 });
 
-// MongoDB avec options de connexion
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ecolojia';
+// Route connexion
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email et mot de passe requis'
+      });
+    }
 
-mongoose.connect(MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-  .then(() => {
-    console.log('✅ MongoDB Atlas connecté avec succès');
-    
-    // Démarrer serveur
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Serveur Ecolojia démarré sur http://localhost:${PORT}`);
-      console.log(`📡 Mode: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🔗 Endpoints disponibles:`);
-      console.log(`   - GET  http://localhost:${PORT}/`);
-      console.log(`   - GET  http://localhost:${PORT}/health`);
-      console.log(`   - POST http://localhost:${PORT}/api/auth/register`);
+    const user = memoryUsers.find(u => u.email === email);
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Email ou mot de passe incorrect'
+      });
+    }
+
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(401).json({
+        success: false,
+        message: 'Email ou mot de passe incorrect'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Connexion réussie',
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        tier: user.tier
+      }
     });
-  })
-  .catch(err => {
-    console.error('❌ Erreur MongoDB:', err.message);
-    
-    // Démarrer quand même le serveur sans MongoDB
-    console.log('⚠️  Démarrage du serveur sans MongoDB...');
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Serveur démarré sur http://localhost:${PORT} (sans DB)`);
+
+  } catch (error) {
+    console.error('Erreur connexion:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur'
     });
+  }
+});
+
+// Route 404
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Route non trouvée',
+    path: req.path
   });
+});
 
 // Gestion erreurs
-process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Rejection:', err);
+app.use((err, req, res, next) => {
+  console.error('Erreur:', err);
+  res.status(500).json({
+    error: 'Erreur serveur interne',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Une erreur est survenue'
+  });
 });
+
+// Connexion MongoDB (optionnelle)
+async function connectDB() {
+  if (process.env.MONGODB_URI) {
+    try {
+      await mongoose.connect(process.env.MONGODB_URI);
+      console.log('✅ MongoDB connecté');
+      dbConnected = true;
+    } catch (error) {
+      console.log('⚠️ MongoDB non connecté, mode mémoire activé');
+      dbConnected = false;
+    }
+  }
+}
+
+// Démarrage serveur
+async function start() {
+  await connectDB();
+  
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Serveur Ecolojia démarré sur port ${PORT}`);
+    console.log(`📦 Mode: ${dbConnected ? 'MongoDB connecté' : 'Stockage mémoire'}`);
+    console.log(`🌍 Environnement: ${process.env.NODE_ENV || 'development'}`);
+  });
+}
+
+start();
