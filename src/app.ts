@@ -1,91 +1,53 @@
-// PATH: src/app.ts
+// PATH: backend/src/app.ts
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
 import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
-import mongoose from 'mongoose';
-import bodyParser from 'body-parser';
+import helmet from 'helmet';
+import authRoutes from './routes/auth';
+import productRoutes from './routes/products';
+import favoritesRoutes from './routes/favorites';
+import historyRoutes from './routes/history';
+import exportRoutes from './routes/export';
+import ultraProcessingRoutes from './routes/ultraProcessing.routes';
+
+// ✅ Import manquant ajouté :
+const dashboardRoutes = require('./routes/dashboard');
 
 dotenv.config();
 
-// 🔒 Sécurité + logs
 const app = express();
-app.use(helmet());
+
 app.use(cors());
+app.use(helmet());
+app.use(express.json());
 app.use(morgan('dev'));
 
-// 🔧 Middlewares
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+// ✅ Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
 
-// ✅ Fonction de connexion MongoDB améliorée
-const connectMongoDB = async () => {
-  try {
-    const uri = process.env.MONGODB_URI;
-    
-    if (!uri) {
-      throw new Error('MONGODB_URI is not defined in environment variables');
-    }
-
-    await mongoose.connect(uri);
-    
-    console.log('✅ MongoDB Atlas connected successfully');
-    console.log(`📍 Connected to database: ${mongoose.connection.db?.databaseName || 'ecolojia'}`);
-    
-    // Event listeners pour monitoring
-    mongoose.connection.on('error', (error) => {
-      console.error('❌ MongoDB connection error:', error);
-    });
-
-    mongoose.connection.on('disconnected', () => {
-      console.warn('⚠️ MongoDB disconnected');
-    });
-
-  } catch (error) {
-    console.error('❌ Failed to connect to MongoDB:', error);
-    // Ne pas faire process.exit(1) ici pour permettre au serveur de démarrer
-    // même si MongoDB n'est pas disponible immédiatement
-  }
-};
-
-// ✅ Connexion MongoDB au démarrage
-connectMongoDB();
-
-// ✅ Routes
-import authRoutes from './routes/auth';
-import multiCategoryRoutes from './routes/multiCategory.routes';
-import productRoutes from './routes/product.routes';
-import userRoutes from './routes/user.routes';
-import paymentRoutes from './routes/payment.routes';
-
+// ✅ Routes principales
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
-app.use('/api/categories', multiCategoryRoutes);
-app.use('/api/user', userRoutes);
-app.use('/api/payment', paymentRoutes);
+app.use('/api/favorites', favoritesRoutes);
+app.use('/api/history', historyRoutes);
+app.use('/api/export', exportRoutes);
+app.use('/api/ultra', ultraProcessingRoutes);
 
-// Route de santé pour vérifier le statut
-app.get('/api/health', (req, res) => {
-  const mongoStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-  res.json({
-    status: 'ok',
-    mongodb: mongoStatus,
-    timestamp: new Date().toISOString()
-  });
-});
+// ✅ Route dashboard ajoutée ici :
+app.use('/api/dashboard', dashboardRoutes);
 
-// Gestion des erreurs 404
-app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found' });
-});
-
-// Gestion des erreurs globales
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', err);
-  res.status(err.status || 500).json({
-    error: err.message || 'Internal server error'
-  });
+// ✅ Route de test
+app.get('/api/ping', (req, res) => {
+  res.json({ success: true, message: 'pong' });
 });
 
 export default app;
+// EOF
