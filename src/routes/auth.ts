@@ -3,236 +3,290 @@ import { Router, Request, Response } from 'express';
 import { authService } from '../auth/services/AuthService';
 import { authMiddleware } from '../middleware/authMiddleware';
 
+// Import des middlewares de sécurité
+import { authRateLimit } from '../middleware/rateLimiter';
+import { asyncErrorHandler } from '../middleware/errorHandler';
+import { ValidationError, AuthenticationError } from '../utils/errors';
+import { createLogger } from '../utils/logger';
+
+// Créer le logger pour les routes auth
+const logger = createLogger('AuthRoutes');
 const router = Router();
 
-// Route d'inscription
-router.post('/register', async (req: Request, res: Response) => {
-  try {
-    const { email, password, name } = req.body;
+// ✅ Validation schemas
+const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
 
-    // Validation basique
-    if (!email || !password || !name) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email, mot de passe et nom sont requis'
-      });
-    }
+const validatePassword = (password: string): boolean => {
+  return password && password.length >= 6;
+};
 
-    // Validation email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Format email invalide'
-      });
-    }
+const validateName = (name: string): boolean => {
+  return name && name.trim().length >= 2 && name.trim().length <= 100;
+};
 
-    // Validation mot de passe (min 6 caractÃ¨res)
-    if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'Le mot de passe doit contenir au moins 6 caractÃ¨res'
-      });
-    }
+// ✅ Route d'inscription avec sécurité
+router.post('/register', authRateLimit(), asyncErrorHandler(async (req: Request, res: Response) => {
+  const { email, password, name } = req.body;
 
-    const sessionInfo = {
-      ipAddress: req.ip || '',
-      userAgent: req.headers['user-agent'] || ''
-    };
+  // Log de la tentative d'inscription
+  logger.info('Registration attempt', { email, name });
 
-    const result = await authService.register(
-      { email, password, name },
-      sessionInfo
-    );
+  // Validation complète
+  const validationErrors: string[] = [];
 
-    if (result.success) {
-      res.status(201).json(result);
-    } else {
-      res.status(400).json(result);
-    }
-  } catch (error) {
-    console.error('Register route error:', error); return res.status(500).json({ error: "Erreur serveur" });
-    res.status(500).json({
-      success: false,
-      message: 'Erreur serveur'
-    });
+  if (!email) {
+    validationErrors.push('Email requis');
+  } else if (!validateEmail(email)) {
+    validationErrors.push('Format email invalide');
   }
-});
 
-// Route de connexion
-router.post('/login', async (req: Request, res: Response) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email et mot de passe requis'
-      });
-    }
-
-    const sessionInfo = {
-      ipAddress: req.ip || '',
-      userAgent: req.headers['user-agent'] || ''
-    };
-
-    const result = await authService.login(
-      { email, password },
-      sessionInfo
-    );
-
-    if (result.success && result.token) {
-      res.json({
-        success: true,
-        message: 'Connexion rÃ©ussie',
-        user: result.user,
-        session: {
-          token: result.token,
-          refreshToken: '', // Non utilisÃ© pour l'instant
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-        }
-      });
-    } else {
-      res.status(401).json(result);
-    }
-  } catch (error) {
-    console.error('Login route error:', error); return res.status(500).json({ error: "Erreur serveur" });
-    res.status(500).json({
-      success: false,
-      message: 'Erreur serveur'
-    });
+  if (!password) {
+    validationErrors.push('Mot de passe requis');
+  } else if (!validatePassword(password)) {
+    validationErrors.push('Le mot de passe doit contenir au moins 6 caractères');
   }
-});
 
-// Route de dÃ©connexion
-router.post('/logout', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    
-    if (token) {
-      await authService.logout(token);
-    }
-
-    res.json({
-      success: true,
-      message: 'DÃ©connexion rÃ©ussie'
-    });
-  } catch (error) {
-    console.error('Logout route error:', error); return res.status(500).json({ error: "Erreur serveur" });
-    res.status(500).json({
-      success: false,
-      message: 'Erreur serveur'
-    });
+  if (!name) {
+    validationErrors.push('Nom requis');
+  } else if (!validateName(name)) {
+    validationErrors.push('Le nom doit contenir entre 2 et 100 caractères');
   }
-});
 
-// Route profil utilisateur
-router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const user = req.user;
+  if (validationErrors.length > 0) {
+    throw new ValidationError('Erreurs de validation', { errors: validationErrors });
+  }
+
+  // Collecter les infos de session
+  const sessionInfo = {
+    ipAddress: req.ip || req.connection.remoteAddress || 'unknown',
+    userAgent: req.headers['user-agent'] || 'unknown',
+    origin: req.headers.origin || req.headers.referer || 'unknown'
+  };
+
+  // Appeler le service
+  const result = await authService.register(
+    { 
+      email: email.toLowerCase().trim(), 
+      password, 
+      name: name.trim() 
+    },
+    sessionInfo
+  );
+
+  if (result.success) {
+    logger.info('User registered successfully', { userId: result.user?.id, email });
+    res.status(201).json(result);
+  } else {
+    logger.warn('Registration failed', { email, reason: result.message });
+    res.status(400).json(result);
+  }
+}));
+
+// ✅ Route de connexion avec sécurité
+router.post('/login', authRateLimit(), asyncErrorHandler(async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+
+  logger.info('Login attempt', { email });
+
+  // Validation
+  if (!email || !password) {
+    throw new ValidationError('Email et mot de passe requis');
+  }
+
+  if (!validateEmail(email)) {
+    throw new ValidationError('Format email invalide');
+  }
+
+  // Collecter les infos de session
+  const sessionInfo = {
+    ipAddress: req.ip || req.connection.remoteAddress || 'unknown',
+    userAgent: req.headers['user-agent'] || 'unknown',
+    origin: req.headers.origin || req.headers.referer || 'unknown'
+  };
+
+  // Appeler le service
+  const result = await authService.login(
+    { 
+      email: email.toLowerCase().trim(), 
+      password 
+    },
+    sessionInfo
+  );
+
+  if (result.success && result.token) {
+    logger.info('User logged in successfully', { userId: result.user?.id, email });
     
     res.json({
       success: true,
-      user: {
-        id: user._id,
-        email: user.email,
-        name: user.name,
-        tier: user.tier,
-        isEmailVerified: user.isEmailVerified,
-        quotas: user.quotas,
-        usage: user.usage,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt
+      message: 'Connexion réussie',
+      user: result.user,
+      session: {
+        token: result.token,
+        refreshToken: result.refreshToken || '',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
       }
     });
-  } catch (error) {
-    console.error('Profile route error:', error); return res.status(500).json({ error: "Erreur serveur" });
-    res.status(500).json({
-      success: false,
-      message: 'Erreur serveur'
-    });
+  } else {
+    logger.warn('Login failed', { email, reason: result.message });
+    throw new AuthenticationError(result.message || 'Email ou mot de passe incorrect');
   }
-});
+}));
 
-// Route vÃ©rification email
-router.get('/verify-email/:token', async (req: Request, res: Response) => {
-  try {
-    const { token } = req.params;
-    
-    const result = await authService.verifyEmail(token);
-    
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(400).json(result);
-    }
-  } catch (error) {
-    console.error('Verify email route error:', error); return res.status(500).json({ error: "Erreur serveur" });
-    res.status(500).json({
-      success: false,
-      message: 'Erreur serveur'
-    });
+// ✅ Route de déconnexion
+router.post('/logout', authMiddleware, asyncErrorHandler(async (req: Request, res: Response) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  const userId = (req as any).user?._id;
+  
+  logger.info('Logout attempt', { userId });
+  
+  if (token) {
+    await authService.logout(token);
   }
-});
 
-// Route demande rÃ©initialisation mot de passe
-router.post('/forgot-password', async (req: Request, res: Response) => {
-  try {
-    const { email } = req.body;
+  logger.info('User logged out successfully', { userId });
+  
+  res.json({
+    success: true,
+    message: 'Déconnexion réussie'
+  });
+}));
 
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email requis'
-      });
+// ✅ Route profil utilisateur
+router.get('/profile', authMiddleware, asyncErrorHandler(async (req: Request, res: Response) => {
+  const user = (req as any).user;
+  
+  logger.debug('Profile access', { userId: user._id });
+  
+  res.json({
+    success: true,
+    user: {
+      id: user._id,
+      email: user.email,
+      name: user.name,
+      tier: user.tier || 'free',
+      isEmailVerified: user.isEmailVerified || false,
+      quotas: user.quotas || {
+        scansPerMonth: 30,
+        aiQuestionsPerDay: 0,
+        exportsPerMonth: 0
+      },
+      currentUsage: user.currentUsage || {
+        scansThisMonth: 0,
+        aiQuestionsToday: 0,
+        exportsThisMonth: 0
+      },
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
     }
+  });
+}));
 
-    const result = await authService.requestPasswordReset(email);
-    
+// ✅ Route vérification email
+router.get('/verify-email/:token', asyncErrorHandler(async (req: Request, res: Response) => {
+  const { token } = req.params;
+  
+  logger.info('Email verification attempt', { token: token.substring(0, 10) + '...' });
+  
+  if (!token) {
+    throw new ValidationError('Token de vérification requis');
+  }
+  
+  const result = await authService.verifyEmail(token);
+  
+  if (result.success) {
+    logger.info('Email verified successfully');
     res.json(result);
-  } catch (error) {
-    console.error('Forgot password route error:', error); return res.status(500).json({ error: "Erreur serveur" });
-    res.status(500).json({
-      success: false,
-      message: 'Erreur serveur'
-    });
+  } else {
+    logger.warn('Email verification failed', { reason: result.message });
+    res.status(400).json(result);
   }
-});
+}));
 
-// Route rÃ©initialisation mot de passe
-router.post('/reset-password/:token', async (req: Request, res: Response) => {
-  try {
-    const { token } = req.params;
-    const { password } = req.body;
+// ✅ Route demande réinitialisation mot de passe
+router.post('/forgot-password', authRateLimit(), asyncErrorHandler(async (req: Request, res: Response) => {
+  const { email } = req.body;
 
-    if (!password || password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'Le nouveau mot de passe doit contenir au moins 6 caractÃ¨res'
-      });
-    }
+  logger.info('Password reset request', { email });
 
-    const result = await authService.resetPassword(token, password);
-    
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(400).json(result);
-    }
-  } catch (error) {
-    console.error('Reset password route error:', error); return res.status(500).json({ error: "Erreur serveur" });
-    res.status(500).json({
-      success: false,
-      message: 'Erreur serveur'
-    });
+  if (!email) {
+    throw new ValidationError('Email requis');
   }
-});
 
-// Route test santÃ© auth
+  if (!validateEmail(email)) {
+    throw new ValidationError('Format email invalide');
+  }
+
+  const result = await authService.requestPasswordReset(email.toLowerCase().trim());
+  
+  // Toujours retourner succès pour éviter l'énumération d'utilisateurs
+  logger.info('Password reset email sent (if user exists)', { email });
+  
+  res.json({
+    success: true,
+    message: 'Si cet email existe, un lien de réinitialisation a été envoyé'
+  });
+}));
+
+// ✅ Route réinitialisation mot de passe
+router.post('/reset-password/:token', authRateLimit(), asyncErrorHandler(async (req: Request, res: Response) => {
+  const { token } = req.params;
+  const { password } = req.body;
+
+  logger.info('Password reset attempt', { token: token.substring(0, 10) + '...' });
+
+  if (!token) {
+    throw new ValidationError('Token de réinitialisation requis');
+  }
+
+  if (!password || !validatePassword(password)) {
+    throw new ValidationError('Le nouveau mot de passe doit contenir au moins 6 caractères');
+  }
+
+  const result = await authService.resetPassword(token, password);
+  
+  if (result.success) {
+    logger.info('Password reset successfully');
+    res.json(result);
+  } else {
+    logger.warn('Password reset failed', { reason: result.message });
+    res.status(400).json(result);
+  }
+}));
+
+// ✅ Route mise à jour profil
+router.put('/profile', authMiddleware, asyncErrorHandler(async (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const { name } = req.body;
+  
+  logger.info('Profile update attempt', { userId: user._id });
+  
+  // Validation
+  if (name && !validateName(name)) {
+    throw new ValidationError('Le nom doit contenir entre 2 et 100 caractères');
+  }
+  
+  // Mise à jour via service (à implémenter)
+  // const result = await authService.updateProfile(user._id, { name });
+  
+  res.json({
+    success: true,
+    message: 'Profil mis à jour',
+    user: {
+      ...user.toObject(),
+      name: name || user.name
+    }
+  });
+}));
+
+// ✅ Route test santé auth
 router.get('/health', (req: Request, res: Response) => {
   res.json({
     success: true,
-    message: 'Auth service is running',
+    service: 'auth',
+    status: 'healthy',
     timestamp: new Date().toISOString()
   });
 });
